@@ -10,7 +10,7 @@
 
 const CARD_TAG = "personal-hydration-card";
 const EDITOR_TAG = "personal-hydration-card-editor";
-const CARD_VERSION = "0.1.1";
+const CARD_VERSION = "0.1.2";
 
 const ML_PER_FL_OZ = 29.5735;
 
@@ -49,8 +49,8 @@ class PersonalHydrationCard extends HTMLElement {
 
   static getStubConfig(hass) {
     const profiles = Object.values(hass?.entities || {})
-      .filter((e) => e.entity_id?.endsWith("_daily_target"))
-      .map((e) => e.entity_id.replace("sensor.", "").replace("_daily_target", ""));
+      .filter((e) => e.entity_id?.startsWith("sensor.phm_") && e.entity_id.endsWith("_daily_target"))
+      .map((e) => e.entity_id.replace("sensor.phm_", "").replace("_daily_target", ""));
     return {
       type: `custom:${CARD_TAG}`,
       profile: profiles[0] || "",
@@ -116,11 +116,11 @@ class PersonalHydrationCard extends HTMLElement {
       return;
     }
 
-    const targetEntity = `sensor.${profile}_daily_target`;
-    const consumedEntity = `sensor.${profile}_consumed_today`;
-    const remainingEntity = `sensor.${profile}_remaining`;
-    const paceEntity = `sensor.${profile}_hourly_pace`;
-    const progressEntity = `sensor.${profile}_progress`;
+    const targetEntity = `sensor.phm_${profile}_daily_target`;
+    const consumedEntity = `sensor.phm_${profile}_consumed_today`;
+    const remainingEntity = `sensor.phm_${profile}_remaining`;
+    const paceEntity = `sensor.phm_${profile}_hourly_pace`;
+    const progressEntity = `sensor.phm_${profile}_progress`;
 
     const target = this._state(targetEntity);
     const consumed = this._state(consumedEntity);
@@ -349,9 +349,9 @@ class PersonalHydrationCardEditor extends HTMLElement {
   _profileOptions() {
     if (!this._hass) return [];
     return Object.values(this._hass.states || {})
-      .filter((s) => s.entity_id.startsWith("sensor.") && s.entity_id.endsWith("_daily_target"))
+      .filter((s) => s.entity_id.startsWith("sensor.phm_") && s.entity_id.endsWith("_daily_target"))
       .map((s) => {
-        const slug = s.entity_id.replace("sensor.", "").replace("_daily_target", "");
+        const slug = s.entity_id.replace("sensor.phm_", "").replace("_daily_target", "");
         return { value: slug, label: s.attributes?.friendly_name?.replace(" Daily target", "") || slug };
       });
   }
