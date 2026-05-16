@@ -1,6 +1,6 @@
 /*!
  * Personal Hydration Card
- * https://github.com/loryanstrant/personal-hydration-manager
+ * https://github.com/loryanstrant/HA-Personal-Hydration-Manager
  * MIT License
  *
  * A single-file vanilla web component — no build step required.
@@ -10,7 +10,7 @@
 
 const CARD_TAG = "personal-hydration-card";
 const EDITOR_TAG = "personal-hydration-card-editor";
-const CARD_VERSION = "0.1.0";
+const CARD_VERSION = "0.1.1";
 
 const ML_PER_FL_OZ = 29.5735;
 
@@ -455,7 +455,7 @@ if (!window.customCards.find((c) => c.type === CARD_TAG)) {
     description: "Track water intake against the NASEM Adequate Intake baseline.",
     preview: true,
     documentationURL:
-      "https://github.com/loryanstrant/personal-hydration-manager#the-dashboard-card",
+      "https://github.com/loryanstrant/HA-Personal-Hydration-Manager#the-dashboard-card",
   });
 }
 
