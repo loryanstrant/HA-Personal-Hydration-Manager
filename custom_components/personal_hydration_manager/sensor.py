@@ -9,7 +9,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, ENTITY_ID_PREFIX
 from .coordinator import HydrationCoordinator
 
 UNIT_ML = "mL"
@@ -43,6 +43,10 @@ class _BaseHydrationSensor(SensorEntity):
         self._coordinator = coordinator
         self._attr_unique_id = f"{coordinator.entry_id}_{key}"
         self._attr_name = name
+        # Pin entity_id so all profile entities share a stable prefix
+        # (sensor.phm_<profile>_<key>). _attr_has_entity_name keeps the
+        # display name clean ("Daily target") on the device card.
+        self.entity_id = f"sensor.{ENTITY_ID_PREFIX}_{coordinator.slug}_{key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, coordinator.entry_id)},
             name=coordinator.name,
