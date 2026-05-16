@@ -12,7 +12,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CARD_URL = "/personal_hydration_manager/personal-hydration-card.js"
 CARD_FILE = "personal-hydration-card.js"
-CARD_VERSION = "0.1.0"
+CARD_VERSION = "0.1.1"
 
 _REGISTERED = "personal_hydration_manager_frontend_registered"
 
