@@ -8,11 +8,26 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, UNIT_FL_OZ, UNIT_L, UNIT_ML, from_ml, to_ml, unit_label
+from .const import DOMAIN, UNIT_FL_OZ, UNIT_L, UNIT_ML, to_ml
 from .coordinator import HydrationCoordinator
 
 # Inlined to avoid breakage on partial HACS updates — see sensor.py.
 ENTITY_ID_PREFIX = "phm"
+_ML_PER_FL_OZ = 29.5735
+
+
+def _from_ml(volume_ml: float, unit: str) -> float:
+    if unit == UNIT_L:
+        return volume_ml / 1000.0
+    if unit == UNIT_FL_OZ:
+        return volume_ml / _ML_PER_FL_OZ
+    return volume_ml
+
+
+def _unit_label(unit: str) -> str:
+    if unit == UNIT_FL_OZ:
+        return "fl oz"
+    return unit  # mL or L
 
 # Override range per unit. Internally we always store mL (cap 8000); the
 # user-facing range is just the same cap converted to their chosen unit.
@@ -52,7 +67,7 @@ class TargetOverrideNumber(NumberEntity):
 
     @property
     def native_unit_of_measurement(self) -> str:
-        return unit_label(self._coordinator.display_unit)
+        return _unit_label(self._coordinator.display_unit)
 
     @property
     def native_min_value(self) -> float:
@@ -79,7 +94,7 @@ class TargetOverrideNumber(NumberEntity):
 
     @property
     def native_value(self) -> float:
-        return round(from_ml(self._coordinator.target_override_ml, self._coordinator.display_unit), 2)
+        return round(_from_ml(self._coordinator.target_override_ml, self._coordinator.display_unit), 2)
 
     async def async_set_native_value(self, value: float) -> None:
         ml = to_ml(float(value), self._coordinator.display_unit)
