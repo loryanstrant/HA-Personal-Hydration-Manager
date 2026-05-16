@@ -1,0 +1,70 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a hydration profile",
+        "description": "Each person gets their own profile, sensors, and dashboard card. Targets come from the NASEM Adequate Intake table.",
+        "data": {
+          "name": "Name",
+          "age": "Age",
+          "gender": "Gender",
+          "pregnancy": "Pregnancy (override target to 2,400 mL)",
+          "lactation": "Lactation (override target to 3,000 mL)",
+          "day_start": "Day starts at (daily reset)",
+          "day_end": "Day ends at (used for pace calculation)",
+          "source_sensor": "Optional source sensor",
+          "source_mode": "Source mode"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "A profile with that name already exists."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Edit hydration profile",
+        "data": {
+          "name": "Name",
+          "age": "Age",
+          "gender": "Gender",
+          "pregnancy": "Pregnancy",
+          "lactation": "Lactation",
+          "day_start": "Day starts at",
+          "day_end": "Day ends at",
+          "source_sensor": "Optional source sensor",
+          "source_mode": "Source mode"
+        }
+      }
+    }
+  },
+  "selector": {
+    "gender": {
+      "options": {
+        "male": "Male",
+        "female": "Female"
+      }
+    },
+    "source_mode": {
+      "options": {
+        "absolute": "Absolute (sensor state = today's total)",
+        "delta": "Delta (sum positive increases)"
+      }
+    }
+  },
+  "services": {
+    "log_drink": {
+      "name": "Log drink",
+      "description": "Add a volume of liquid to a profile's consumed-today total."
+    },
+    "reset_today": {
+      "name": "Reset today",
+      "description": "Reset a profile's consumed-today total to zero."
+    },
+    "set_consumed": {
+      "name": "Set consumed",
+      "description": "Set a profile's consumed-today total to a specific value."
+    }
+  }
+}

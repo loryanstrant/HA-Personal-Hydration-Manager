@@ -1,0 +1,83 @@
+log_drink:
+  name: Log drink
+  description: >-
+    Add a volume of liquid to a profile's consumed-today total.
+  fields:
+    profile:
+      name: Profile
+      description: >-
+        The profile slug (lowercased name with spaces replaced by underscores)
+        or the config entry ID.
+      required: true
+      example: alex
+      selector:
+        text:
+    volume:
+      name: Volume
+      description: How much was consumed.
+      required: true
+      example: 250
+      selector:
+        number:
+          min: 1
+          max: 5000
+          step: 1
+          mode: box
+          unit_of_measurement: mL
+    unit:
+      name: Unit
+      description: Volume unit.
+      required: false
+      default: mL
+      selector:
+        select:
+          options:
+            - mL
+            - L
+            - fl_oz
+
+reset_today:
+  name: Reset today
+  description: Reset a profile's consumed-today total to zero.
+  fields:
+    profile:
+      name: Profile
+      description: Profile slug or config entry ID.
+      required: true
+      example: alex
+      selector:
+        text:
+
+set_consumed:
+  name: Set consumed
+  description: >-
+    Set a profile's consumed-today total to a specific value (replaces, not
+    adds). Useful when syncing from an external tracker.
+  fields:
+    profile:
+      name: Profile
+      required: true
+      example: alex
+      selector:
+        text:
+    volume:
+      name: Volume
+      required: true
+      example: 1200
+      selector:
+        number:
+          min: 0
+          max: 8000
+          step: 1
+          mode: box
+          unit_of_measurement: mL
+    unit:
+      name: Unit
+      required: false
+      default: mL
+      selector:
+        select:
+          options:
+            - mL
+            - L
+            - fl_oz

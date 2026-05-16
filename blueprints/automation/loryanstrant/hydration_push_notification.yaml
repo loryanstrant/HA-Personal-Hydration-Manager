@@ -1,0 +1,132 @@
+blueprint:
+  name: Hydration — Confirmation Push Notification
+  description: >-
+    Sends an actionable mobile-app notification reminding someone to drink
+    water. The notification reports current progress, recommended pace, and
+    remaining volume — and requires the user to confirm via the "I drank some"
+    action, so it's not as easy to dismiss as a regular notification.
+
+    Tapping "I drank some" logs a configurable amount against the chosen
+    Personal Hydration Manager profile.
+
+    Pair this with any trigger you like (e.g. a time pattern every hour, or
+    a numeric_state trigger when progress falls below a threshold).
+  domain: automation
+  source_url: https://github.com/loryanstrant/personal-hydration-manager/blob/main/blueprints/automation/loryanstrant/hydration_push_notification.yaml
+  input:
+    profile:
+      name: Hydration profile
+      description: >-
+        The profile slug — the part of the entity ID between "sensor." and
+        "_consumed_today". For example, if the entity is
+        sensor.alex_consumed_today, the slug is `alex`.
+      selector:
+        text:
+    notify_service:
+      name: Mobile notify service
+      description: >-
+        The notify service for the user's mobile device, e.g.
+        notify.mobile_app_alexs_iphone (omit the "notify." prefix).
+      selector:
+        text:
+    consumed_sensor:
+      name: Consumed-today sensor
+      selector:
+        entity:
+          domain: sensor
+    target_sensor:
+      name: Daily target sensor
+      selector:
+        entity:
+          domain: sensor
+    remaining_sensor:
+      name: Remaining sensor
+      selector:
+        entity:
+          domain: sensor
+    pace_sensor:
+      name: Hourly pace sensor
+      selector:
+        entity:
+          domain: sensor
+    progress_sensor:
+      name: Progress sensor (percent)
+      selector:
+        entity:
+          domain: sensor
+    drink_volume:
+      name: Volume to log when the user taps "I drank some"
+      default: 250
+      selector:
+        number:
+          min: 50
+          max: 1000
+          step: 50
+          unit_of_measurement: mL
+          mode: slider
+    triggers:
+      name: Trigger(s)
+      description: >-
+        When should the reminder fire? For example, a time pattern
+        ("every hour at minute 0"), or a numeric_state trigger when progress
+        falls below a threshold during certain hours.
+      selector:
+        trigger:
+
+trigger: !input triggers
+
+variables:
+  profile: !input profile
+  notify_service: !input notify_service
+  drink_volume: !input drink_volume
+  consumed_sensor: !input consumed_sensor
+  target_sensor: !input target_sensor
+  remaining_sensor: !input remaining_sensor
+  pace_sensor: !input pace_sensor
+  progress_sensor: !input progress_sensor
+  notification_tag: "hydration_{{ profile }}_{{ now().timestamp() | int }}"
+  drank_action: "HYDRATION_DRANK_{{ notification_tag }}"
+
+action:
+  - variables:
+      progress_pct: "{{ states(progress_sensor) | float(0) | round(0) }}"
+      consumed_ml: "{{ states(consumed_sensor) | float(0) | round(0) }}"
+      target_ml: "{{ states(target_sensor) | float(0) | round(0) }}"
+      remaining_ml: "{{ states(remaining_sensor) | float(0) | round(0) }}"
+      pace_ml: "{{ states(pace_sensor) | float(0) | round(0) }}"
+  - service: "notify.{{ notify_service | regex_replace('^notify\\.', '') }}"
+    data:
+      title: "Time for water 💧"
+      message: >-
+        You're at {{ progress_pct }}% ({{ consumed_ml }} / {{ target_ml }} mL).
+        {{ remaining_ml }} mL to go — aim for {{ pace_ml }} mL/h to stay on track.
+      data:
+        tag: "{{ notification_tag }}"
+        push:
+          interruption-level: time-sensitive
+        sticky: true
+        persistent: true
+        notification_icon: mdi:cup-water
+        actions:
+          - action: "{{ drank_action }}"
+            title: "I drank some 💧"
+  - wait_for_trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "{{ drank_action }}"
+    timeout:
+      hours: 2
+    continue_on_timeout: true
+  - choose:
+      - conditions:
+          - "{{ wait.trigger is not none }}"
+        sequence:
+          - service: personal_hydration_manager.log_drink
+            data:
+              profile: "{{ profile }}"
+              volume: "{{ drink_volume }}"
+              unit: mL
+
+mode: parallel
+max: 10
