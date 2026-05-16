@@ -10,7 +10,7 @@
 
 const CARD_TAG = "personal-hydration-card";
 const EDITOR_TAG = "personal-hydration-card-editor";
-const CARD_VERSION = "0.1.3";
+const CARD_VERSION = "0.1.4";
 
 const ML_PER_FL_OZ = 29.5735;
 
@@ -54,6 +54,7 @@ class PersonalHydrationCard extends HTMLElement {
     return {
       type: `custom:${CARD_TAG}`,
       profile: profiles[0] || "",
+      show_title: true,
       show_cup: true,
       show_countdown: true,
       show_manual: true,
@@ -70,6 +71,7 @@ class PersonalHydrationCard extends HTMLElement {
     if (!config) throw new Error("Invalid configuration");
     this._config = {
       profile: "",
+      show_title: true,
       show_cup: true,
       show_countdown: true,
       show_manual: true,
@@ -97,11 +99,11 @@ class PersonalHydrationCard extends HTMLElement {
   }
 
   getCardSize() {
-    let size = 1;
+    let size = this._config?.show_title === false ? 0 : 1;
     if (this._config?.show_cup) size += 3;
     if (this._config?.show_countdown) size += 1;
     if (this._config?.show_manual) size += 1;
-    return size;
+    return Math.max(size, 1);
   }
 
   _state(entity_id) {
@@ -144,14 +146,19 @@ class PersonalHydrationCard extends HTMLElement {
 
     const name = target.attributes?.friendly_name?.split(" ")[0] || profile;
 
+    const showTitle = this._config.show_title !== false;
     this.shadowRoot.innerHTML = `
       ${this._styles()}
       <ha-card>
         <div class="hyd-root">
-          <header class="hyd-header">
-            <div class="hyd-name">${name}</div>
-            <div class="hyd-percent">${progressPct.toFixed(0)}%</div>
-          </header>
+          ${showTitle ? `
+            <header class="hyd-header">
+              <div class="hyd-name">${name}</div>
+              <div class="hyd-percent">${progressPct.toFixed(0)}%</div>
+            </header>
+          ` : `
+            <div class="hyd-percent-only">${progressPct.toFixed(0)}%</div>
+          `}
 
           ${this._config.show_cup ? this._renderCup(progressPct, unit, consumedMl, targetMl) : ""}
           ${this._config.show_countdown ? this._renderCountdown(remainingMl, paceMl, unit) : ""}
@@ -293,6 +300,10 @@ class PersonalHydrationCard extends HTMLElement {
         }
         .hyd-name { font-weight: 600; font-size: 1.1rem; }
         .hyd-percent { font-size: 1.25rem; font-weight: 700; color: var(--primary-color, #2196f3); }
+        .hyd-percent-only {
+          font-size: 1.25rem; font-weight: 700; color: var(--primary-color, #2196f3);
+          text-align: right;
+        }
         .hyd-cup-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .hyd-cup { width: 160px; height: 180px; }
         .hyd-cup-caption { font-size: 0.95rem; }
@@ -392,6 +403,7 @@ class PersonalHydrationCardEditor extends HTMLElement {
       <div class="row">
         <label>Display views</label>
         <div class="checks">
+          <label class="check"><input type="checkbox" id="show_title" ${this._config.show_title !== false ? "checked" : ""}/> Title (person's name)</label>
           <label class="check"><input type="checkbox" id="show_cup" ${this._config.show_cup ? "checked" : ""}/> Cup fill</label>
           <label class="check"><input type="checkbox" id="show_countdown" ${this._config.show_countdown ? "checked" : ""}/> Countdown + pace</label>
           <label class="check"><input type="checkbox" id="show_manual" ${this._config.show_manual ? "checked" : ""}/> Manual add buttons</label>
@@ -415,7 +427,7 @@ class PersonalHydrationCardEditor extends HTMLElement {
     this.shadowRoot.getElementById("profile").addEventListener("change", (e) =>
       this._update("profile", e.target.value)
     );
-    ["show_cup", "show_countdown", "show_manual"].forEach((k) => {
+    ["show_title", "show_cup", "show_countdown", "show_manual"].forEach((k) => {
       this.shadowRoot.getElementById(k).addEventListener("change", (e) =>
         this._update(k, e.target.checked)
       );
