@@ -25,7 +25,7 @@ from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
-CARD_VERSION = "0.1.4"
+CARD_VERSION = "0.1.6"
 STATIC_URL_BASE = "/personal_hydration_manager_static"
 CARD_FILE = "personal-hydration-card.js"
 CARD_URL = f"{STATIC_URL_BASE}/{CARD_FILE}"
