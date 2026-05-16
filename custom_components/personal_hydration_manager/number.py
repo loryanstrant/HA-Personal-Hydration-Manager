@@ -8,8 +8,11 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, ENTITY_ID_PREFIX
+from .const import DOMAIN
 from .coordinator import HydrationCoordinator
+
+# Inlined to avoid breakage on partial HACS updates — see sensor.py.
+ENTITY_ID_PREFIX = "phm"
 
 
 async def async_setup_entry(
