@@ -9,11 +9,16 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, ENTITY_ID_PREFIX
+from .const import DOMAIN
 from .coordinator import HydrationCoordinator
 
 UNIT_ML = "mL"
 UNIT_ML_PER_H = "mL/h"
+
+# Short prefix for entity IDs (e.g. sensor.phm_alex_consumed_today).
+# Inlined rather than imported from const.py so platform setup doesn't break
+# if a HACS update lands the new sensor.py before const.py is refreshed.
+ENTITY_ID_PREFIX = "phm"
 
 
 async def async_setup_entry(
