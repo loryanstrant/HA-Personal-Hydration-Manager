@@ -38,6 +38,11 @@ _RANGE_BY_UNIT = {
 }
 
 
+def _safe_display_unit(coordinator: HydrationCoordinator) -> str:
+    """Read coordinator.display_unit defensively (see sensor.py)."""
+    return getattr(coordinator, "display_unit", UNIT_ML)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -67,19 +72,19 @@ class TargetOverrideNumber(NumberEntity):
 
     @property
     def native_unit_of_measurement(self) -> str:
-        return _unit_label(self._coordinator.display_unit)
+        return _unit_label(_safe_display_unit(self._coordinator))
 
     @property
     def native_min_value(self) -> float:
-        return _RANGE_BY_UNIT.get(self._coordinator.display_unit, _RANGE_BY_UNIT[UNIT_ML])[0]
+        return _RANGE_BY_UNIT.get(_safe_display_unit(self._coordinator), _RANGE_BY_UNIT[UNIT_ML])[0]
 
     @property
     def native_max_value(self) -> float:
-        return _RANGE_BY_UNIT.get(self._coordinator.display_unit, _RANGE_BY_UNIT[UNIT_ML])[1]
+        return _RANGE_BY_UNIT.get(_safe_display_unit(self._coordinator), _RANGE_BY_UNIT[UNIT_ML])[1]
 
     @property
     def native_step(self) -> float:
-        return _RANGE_BY_UNIT.get(self._coordinator.display_unit, _RANGE_BY_UNIT[UNIT_ML])[2]
+        return _RANGE_BY_UNIT.get(_safe_display_unit(self._coordinator), _RANGE_BY_UNIT[UNIT_ML])[2]
 
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(
@@ -94,8 +99,8 @@ class TargetOverrideNumber(NumberEntity):
 
     @property
     def native_value(self) -> float:
-        return round(_from_ml(self._coordinator.target_override_ml, self._coordinator.display_unit), 2)
+        return round(_from_ml(self._coordinator.target_override_ml, _safe_display_unit(self._coordinator)), 2)
 
     async def async_set_native_value(self, value: float) -> None:
-        ml = to_ml(float(value), self._coordinator.display_unit)
+        ml = to_ml(float(value), _safe_display_unit(self._coordinator))
         await self._coordinator.async_set_target_override(ml)

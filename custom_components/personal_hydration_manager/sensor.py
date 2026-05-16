@@ -9,7 +9,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, UNIT_FL_OZ, UNIT_L
+from .const import DOMAIN, UNIT_FL_OZ, UNIT_L, UNIT_ML
 from .coordinator import HydrationCoordinator
 
 # Short prefix for entity IDs (e.g. sensor.phm_alex_consumed_today).
@@ -38,6 +38,17 @@ def _unit_label(unit: str) -> str:
 
 def _pace_unit_label(unit: str) -> str:
     return f"{_unit_label(unit)}/h"
+
+
+def _safe_display_unit(coordinator: HydrationCoordinator) -> str:
+    """Read coordinator.display_unit defensively.
+
+    If HACS landed a partial update where sensor.py is new but coordinator.py
+    is still the stale v0.1.3 revision (no display_unit attribute), fall back
+    to mL so the entity still registers instead of silently failing during
+    platform setup.
+    """
+    return getattr(coordinator, "display_unit", UNIT_ML)
 
 
 async def async_setup_entry(
@@ -95,7 +106,7 @@ class _VolumeSensor(_BaseHydrationSensor):
 
     @property
     def native_unit_of_measurement(self) -> str:
-        return _unit_label(self._coordinator.display_unit)
+        return _unit_label(_safe_display_unit(self._coordinator))
 
 
 class DailyTargetSensor(_VolumeSensor):
@@ -107,7 +118,7 @@ class DailyTargetSensor(_VolumeSensor):
 
     @property
     def native_value(self) -> float:
-        return round(_from_ml(self._coordinator.target_ml, self._coordinator.display_unit), 2)
+        return round(_from_ml(self._coordinator.target_ml, _safe_display_unit(self._coordinator)), 2)
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -132,7 +143,7 @@ class ConsumedTodaySensor(_VolumeSensor):
 
     @property
     def native_value(self) -> float:
-        return round(_from_ml(self._coordinator.consumed_ml, self._coordinator.display_unit), 2)
+        return round(_from_ml(self._coordinator.consumed_ml, _safe_display_unit(self._coordinator)), 2)
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -148,7 +159,7 @@ class RemainingSensor(_VolumeSensor):
 
     @property
     def native_value(self) -> float:
-        return round(_from_ml(self._coordinator.remaining_ml, self._coordinator.display_unit), 2)
+        return round(_from_ml(self._coordinator.remaining_ml, _safe_display_unit(self._coordinator)), 2)
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -164,11 +175,11 @@ class HourlyPaceSensor(_BaseHydrationSensor):
 
     @property
     def native_unit_of_measurement(self) -> str:
-        return _pace_unit_label(self._coordinator.display_unit)
+        return _pace_unit_label(_safe_display_unit(self._coordinator))
 
     @property
     def native_value(self) -> float:
-        return round(_from_ml(self._coordinator.hourly_pace_ml, self._coordinator.display_unit), 2)
+        return round(_from_ml(self._coordinator.hourly_pace_ml, _safe_display_unit(self._coordinator)), 2)
 
     @property
     def extra_state_attributes(self) -> dict:

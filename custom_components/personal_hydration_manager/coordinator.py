@@ -30,9 +30,13 @@ from .const import (
     SOURCE_MODE_DELTA,
     STORAGE_KEY_FMT,
     STORAGE_VERSION,
+    UNIT_ML,
     calculate_nasem_target,
     to_ml,
 )
+
+# Inlined — see config_flow.py for rationale.
+CONF_UNIT = "unit"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -78,6 +82,10 @@ class HydrationCoordinator:
         self.day_end: time = _parse_time(cfg.get(CONF_DAY_END), DEFAULT_DAY_END)
         self.source_sensor: str | None = cfg.get(CONF_SOURCE_SENSOR) or None
         self.source_mode: str = cfg.get(CONF_SOURCE_MODE, SOURCE_MODE_ABSOLUTE)
+        # Display unit chosen by the user. Internal storage stays in mL —
+        # the NASEM table is in mL and conversion happens only at the
+        # sensor/number boundary via const.from_ml / const.to_ml.
+        self.display_unit: str = cfg.get(CONF_UNIT, UNIT_ML)
 
     @property
     def signal(self) -> str:

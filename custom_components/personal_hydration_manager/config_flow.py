@@ -18,7 +18,6 @@ from .const import (
     CONF_PREGNANCY,
     CONF_SOURCE_MODE,
     CONF_SOURCE_SENSOR,
-    CONF_UNIT,
     DEFAULT_DAY_END,
     DEFAULT_DAY_START,
     DOMAIN,
@@ -29,6 +28,12 @@ from .const import (
     UNIT_L,
     UNIT_ML,
 )
+
+# Inlined to survive partial HACS updates — if a deploy lands the new
+# config_flow.py before const.py is refreshed, importing CONF_UNIT from
+# const would fail and HA would refuse to load the handler with
+# "Invalid handler specified".
+CONF_UNIT = "unit"
 
 
 def _profile_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
