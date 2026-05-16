@@ -131,7 +131,12 @@ class HydrationOptionsFlow(config_entries.OptionsFlow):
     """Edit an existing profile."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
+        # In HA 2024.12+ ``OptionsFlow.config_entry`` became a read-only
+        # property that the framework auto-populates. Assigning it here
+        # raises AttributeError, which the frontend surfaces as a 500
+        # "Server got itself in trouble" when the gear icon is clicked.
+        # Store under a private name to dodge the property entirely.
+        self._entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -141,5 +146,5 @@ class HydrationOptionsFlow(config_entries.OptionsFlow):
                 user_input.pop(CONF_SOURCE_SENSOR, None)
             return self.async_create_entry(title="", data=user_input)
 
-        merged = {**self.config_entry.data, **self.config_entry.options}
+        merged = {**self._entry.data, **self._entry.options}
         return self.async_show_form(step_id="init", data_schema=_profile_schema(merged))
