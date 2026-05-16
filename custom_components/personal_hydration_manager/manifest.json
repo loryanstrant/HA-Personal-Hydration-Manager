@@ -1,0 +1,13 @@
+{
+  "domain": "personal_hydration_manager",
+  "name": "Personal Hydration Manager",
+  "codeowners": ["@loryanstrant"],
+  "config_flow": true,
+  "dependencies": ["http", "frontend"],
+  "documentation": "https://github.com/loryanstrant/personal-hydration-manager",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/loryanstrant/personal-hydration-manager/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
