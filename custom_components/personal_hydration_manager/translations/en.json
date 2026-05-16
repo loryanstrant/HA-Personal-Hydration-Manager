@@ -53,13 +53,6 @@
         "absolute": "Absolute (sensor state = today's total)",
         "delta": "Delta (sum positive increases)"
       }
-    },
-    "unit": {
-      "options": {
-        "mL": "Millilitres (mL)",
-        "L": "Litres (L)",
-        "fl_oz": "Fluid ounces (fl oz)"
-      }
     }
   },
   "services": {
