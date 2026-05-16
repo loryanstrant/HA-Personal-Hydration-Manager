@@ -4,10 +4,10 @@
   "codeowners": ["@loryanstrant"],
   "config_flow": true,
   "dependencies": ["http", "frontend"],
-  "documentation": "https://github.com/loryanstrant/personal-hydration-manager",
+  "documentation": "https://github.com/loryanstrant/HA-Personal-Hydration-Manager",
   "integration_type": "service",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/loryanstrant/personal-hydration-manager/issues",
+  "issue_tracker": "https://github.com/loryanstrant/HA-Personal-Hydration-Manager/issues",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.1.1"
 }
