@@ -3,7 +3,7 @@
   "name": "Personal Hydration Manager",
   "codeowners": ["@loryanstrant"],
   "config_flow": true,
-  "dependencies": ["http", "frontend"],
+  "dependencies": ["http", "frontend", "lovelace"],
   "documentation": "https://github.com/loryanstrant/HA-Personal-Hydration-Manager",
   "integration_type": "service",
   "iot_class": "calculated",
