@@ -29,31 +29,50 @@ from .const import (
 
 def _profile_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     d = defaults or {}
-    return vol.Schema(
-        {
-            vol.Required(CONF_NAME, default=d.get(CONF_NAME, "")): str,
-            vol.Required(CONF_AGE, default=d.get(CONF_AGE, 30)): vol.All(
-                vol.Coerce(int), vol.Range(min=1, max=120)
-            ),
-            vol.Required(CONF_GENDER, default=d.get(CONF_GENDER, "female")): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=GENDERS, translation_key="gender", mode=selector.SelectSelectorMode.DROPDOWN
-                )
-            ),
-            vol.Optional(CONF_PREGNANCY, default=d.get(CONF_PREGNANCY, False)): bool,
-            vol.Optional(CONF_LACTATION, default=d.get(CONF_LACTATION, False)): bool,
-            vol.Required(CONF_DAY_START, default=d.get(CONF_DAY_START, DEFAULT_DAY_START)): selector.TimeSelector(),
-            vol.Required(CONF_DAY_END, default=d.get(CONF_DAY_END, DEFAULT_DAY_END)): selector.TimeSelector(),
-            vol.Optional(CONF_SOURCE_SENSOR, default=d.get(CONF_SOURCE_SENSOR, "")): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_SOURCE_MODE, default=d.get(CONF_SOURCE_MODE, SOURCE_MODE_ABSOLUTE)): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=SOURCE_MODES, translation_key="source_mode", mode=selector.SelectSelectorMode.DROPDOWN
-                )
-            ),
-        }
+    schema: dict[Any, Any] = {
+        vol.Required(CONF_NAME, default=d.get(CONF_NAME, "")): str,
+        vol.Required(CONF_AGE, default=d.get(CONF_AGE, 30)): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=1, max=120, step=1, mode=selector.NumberSelectorMode.BOX
+            )
+        ),
+        vol.Required(CONF_GENDER, default=d.get(CONF_GENDER, "female")): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=GENDERS,
+                translation_key="gender",
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
+        vol.Optional(CONF_PREGNANCY, default=d.get(CONF_PREGNANCY, False)): bool,
+        vol.Optional(CONF_LACTATION, default=d.get(CONF_LACTATION, False)): bool,
+        vol.Required(CONF_DAY_START, default=d.get(CONF_DAY_START, DEFAULT_DAY_START)): selector.TimeSelector(),
+        vol.Required(CONF_DAY_END, default=d.get(CONF_DAY_END, DEFAULT_DAY_END)): selector.TimeSelector(),
+    }
+
+    # Optional source sensor: only attach a default when one is actually
+    # configured. An empty-string default fails EntitySelector validation
+    # ("Entity is neither a valid entity ID nor a valid UUID").
+    existing_source = d.get(CONF_SOURCE_SENSOR)
+    if existing_source:
+        schema[vol.Optional(CONF_SOURCE_SENSOR, default=existing_source)] = (
+            selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
+        )
+    else:
+        schema[vol.Optional(CONF_SOURCE_SENSOR)] = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="sensor")
+        )
+
+    schema[
+        vol.Optional(CONF_SOURCE_MODE, default=d.get(CONF_SOURCE_MODE, SOURCE_MODE_ABSOLUTE))
+    ] = selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=SOURCE_MODES,
+            translation_key="source_mode",
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
     )
+
+    return vol.Schema(schema)
 
 
 class HydrationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
