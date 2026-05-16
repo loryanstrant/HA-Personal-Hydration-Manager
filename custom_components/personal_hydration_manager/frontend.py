@@ -21,7 +21,6 @@ from pathlib import Path
 
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.components.lovelace.resources import ResourceStorageCollection
 from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,9 +75,7 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
         _LOGGER.debug("Lovelace not loaded yet — skipping resource registration")
         return
 
-    resources: ResourceStorageCollection | None = getattr(
-        lovelace_data, "resources", None
-    )
+    resources = getattr(lovelace_data, "resources", None)
     if resources is None:
         # YAML mode — there is no storage collection to update.
         _LOGGER.debug("Lovelace is in YAML mode — using extra_js_url only")
