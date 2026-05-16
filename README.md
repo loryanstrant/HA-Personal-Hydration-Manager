@@ -1,7 +1,7 @@
 # Personal Hydration Manager
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
-![hacs validate](https://github.com/loryanstrant/personal-hydration-manager/actions/workflows/validate.yml/badge.svg)
+![hacs validate](https://github.com/loryanstrant/HA-Personal-Hydration-Manager/actions/workflows/validate.yml/badge.svg)
 
 A Home Assistant integration to track daily water intake for one or more people in your household, with a built-in Lovelace card.
 
@@ -38,7 +38,7 @@ Targets are derived from the **National Academies of Sciences, Engineering, and 
 ### Via HACS (recommended)
 
 1. Open HACS → Integrations → ⋮ → **Custom repositories**.
-2. Add `https://github.com/loryanstrant/personal-hydration-manager` with type **Integration**.
+2. Add `https://github.com/loryanstrant/HA-Personal-Hydration-Manager` with type **Integration**.
 3. Install **Personal Hydration Manager**, then **restart Home Assistant**.
 4. Settings → Devices & Services → **Add Integration** → Personal Hydration Manager.
 
@@ -158,7 +158,7 @@ The card is shipped pre-built as a single vanilla-JavaScript Web Component (no b
 
 ## Contributing
 
-Issues and PRs welcome on [GitHub](https://github.com/loryanstrant/personal-hydration-manager).
+Issues and PRs welcome on [GitHub](https://github.com/loryanstrant/HA-Personal-Hydration-Manager).
 
 ## Disclaimer
 
