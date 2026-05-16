@@ -18,12 +18,16 @@ from .const import (
     CONF_PREGNANCY,
     CONF_SOURCE_MODE,
     CONF_SOURCE_SENSOR,
+    CONF_UNIT,
     DEFAULT_DAY_END,
     DEFAULT_DAY_START,
     DOMAIN,
     GENDERS,
     SOURCE_MODE_ABSOLUTE,
     SOURCE_MODES,
+    UNIT_FL_OZ,
+    UNIT_L,
+    UNIT_ML,
 )
 
 
@@ -68,6 +72,21 @@ def _profile_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
         selector.SelectSelectorConfig(
             options=SOURCE_MODES,
             translation_key="source_mode",
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
+    )
+
+    # Inline labels (not translation_key) because hassfest forbids the
+    # uppercase 'mL'/'L' keys we use as canonical unit strings.
+    schema[
+        vol.Required(CONF_UNIT, default=d.get(CONF_UNIT, UNIT_ML))
+    ] = selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[
+                selector.SelectOptionDict(value=UNIT_ML, label="Millilitres (mL)"),
+                selector.SelectOptionDict(value=UNIT_L, label="Litres (L)"),
+                selector.SelectOptionDict(value=UNIT_FL_OZ, label="Fluid ounces (fl oz)"),
+            ],
             mode=selector.SelectSelectorMode.DROPDOWN,
         )
     )

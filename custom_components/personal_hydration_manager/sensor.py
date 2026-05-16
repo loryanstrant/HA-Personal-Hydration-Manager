@@ -9,11 +9,8 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, from_ml, pace_unit_label, unit_label
 from .coordinator import HydrationCoordinator
-
-UNIT_ML = "mL"
-UNIT_ML_PER_H = "mL/h"
 
 # Short prefix for entity IDs (e.g. sensor.phm_alex_consumed_today).
 # Inlined rather than imported from const.py so platform setup doesn't break
@@ -71,8 +68,15 @@ class _BaseHydrationSensor(SensorEntity):
         self.async_write_ha_state()
 
 
-class DailyTargetSensor(_BaseHydrationSensor):
-    _attr_native_unit_of_measurement = UNIT_ML
+class _VolumeSensor(_BaseHydrationSensor):
+    """Sensor whose value is a millilitre figure rendered in the chosen unit."""
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        return unit_label(self._coordinator.display_unit)
+
+
+class DailyTargetSensor(_VolumeSensor):
     _attr_state_class = SensorStateClass.TOTAL
     _attr_icon = "mdi:target"
 
@@ -80,8 +84,8 @@ class DailyTargetSensor(_BaseHydrationSensor):
         super().__init__(coordinator, "daily_target", "Daily target")
 
     @property
-    def native_value(self) -> int:
-        return self._coordinator.target_ml
+    def native_value(self) -> float:
+        return round(from_ml(self._coordinator.target_ml, self._coordinator.display_unit), 2)
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -93,11 +97,11 @@ class DailyTargetSensor(_BaseHydrationSensor):
             "lactation": c.lactation,
             "source": "NASEM Adequate Intake (Total Beverages)",
             "override_ml": c.target_override_ml or None,
+            "target_ml": c.target_ml,
         }
 
 
-class ConsumedTodaySensor(_BaseHydrationSensor):
-    _attr_native_unit_of_measurement = UNIT_ML
+class ConsumedTodaySensor(_VolumeSensor):
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_icon = "mdi:cup-water"
 
@@ -106,11 +110,14 @@ class ConsumedTodaySensor(_BaseHydrationSensor):
 
     @property
     def native_value(self) -> float:
-        return round(self._coordinator.consumed_ml, 1)
+        return round(from_ml(self._coordinator.consumed_ml, self._coordinator.display_unit), 2)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {"consumed_ml": round(self._coordinator.consumed_ml, 1)}
 
 
-class RemainingSensor(_BaseHydrationSensor):
-    _attr_native_unit_of_measurement = UNIT_ML
+class RemainingSensor(_VolumeSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:water-percent"
 
@@ -119,11 +126,14 @@ class RemainingSensor(_BaseHydrationSensor):
 
     @property
     def native_value(self) -> float:
-        return round(self._coordinator.remaining_ml, 1)
+        return round(from_ml(self._coordinator.remaining_ml, self._coordinator.display_unit), 2)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {"remaining_ml": round(self._coordinator.remaining_ml, 1)}
 
 
 class HourlyPaceSensor(_BaseHydrationSensor):
-    _attr_native_unit_of_measurement = UNIT_ML_PER_H
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:speedometer"
 
@@ -131,8 +141,16 @@ class HourlyPaceSensor(_BaseHydrationSensor):
         super().__init__(coordinator, "hourly_pace", "Hourly pace")
 
     @property
+    def native_unit_of_measurement(self) -> str:
+        return pace_unit_label(self._coordinator.display_unit)
+
+    @property
     def native_value(self) -> float:
-        return self._coordinator.hourly_pace_ml
+        return round(from_ml(self._coordinator.hourly_pace_ml, self._coordinator.display_unit), 2)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {"pace_ml_per_h": self._coordinator.hourly_pace_ml}
 
 
 class ProgressSensor(_BaseHydrationSensor):

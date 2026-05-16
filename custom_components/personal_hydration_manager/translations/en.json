@@ -13,7 +13,8 @@
           "day_start": "Day starts at (daily reset)",
           "day_end": "Day ends at (used for pace calculation)",
           "source_sensor": "Optional source sensor",
-          "source_mode": "Source mode"
+          "source_mode": "Source mode",
+          "unit": "Display unit"
         }
       }
     },
@@ -34,7 +35,8 @@
           "day_start": "Day starts at",
           "day_end": "Day ends at",
           "source_sensor": "Optional source sensor",
-          "source_mode": "Source mode"
+          "source_mode": "Source mode",
+          "unit": "Display unit"
         }
       }
     }
