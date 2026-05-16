@@ -8,11 +8,19 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, UNIT_FL_OZ, UNIT_L, UNIT_ML, from_ml, to_ml, unit_label
 from .coordinator import HydrationCoordinator
 
 # Inlined to avoid breakage on partial HACS updates — see sensor.py.
 ENTITY_ID_PREFIX = "phm"
+
+# Override range per unit. Internally we always store mL (cap 8000); the
+# user-facing range is just the same cap converted to their chosen unit.
+_RANGE_BY_UNIT = {
+    UNIT_ML: (0, 8000, 50),
+    UNIT_L: (0, 8, 0.05),
+    UNIT_FL_OZ: (0, 270, 1),
+}
 
 
 async def async_setup_entry(
@@ -31,10 +39,6 @@ class TargetOverrideNumber(NumberEntity):
     _attr_has_entity_name = True
     _attr_name = "Target override"
     _attr_icon = "mdi:tune"
-    _attr_native_unit_of_measurement = "mL"
-    _attr_native_min_value = 0
-    _attr_native_max_value = 8000
-    _attr_native_step = 50
     _attr_mode = NumberMode.BOX
 
     def __init__(self, coordinator: HydrationCoordinator) -> None:
@@ -45,6 +49,22 @@ class TargetOverrideNumber(NumberEntity):
             identifiers={(DOMAIN, coordinator.entry_id)},
             name=coordinator.name,
         )
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        return unit_label(self._coordinator.display_unit)
+
+    @property
+    def native_min_value(self) -> float:
+        return _RANGE_BY_UNIT.get(self._coordinator.display_unit, _RANGE_BY_UNIT[UNIT_ML])[0]
+
+    @property
+    def native_max_value(self) -> float:
+        return _RANGE_BY_UNIT.get(self._coordinator.display_unit, _RANGE_BY_UNIT[UNIT_ML])[1]
+
+    @property
+    def native_step(self) -> float:
+        return _RANGE_BY_UNIT.get(self._coordinator.display_unit, _RANGE_BY_UNIT[UNIT_ML])[2]
 
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(
@@ -59,7 +79,8 @@ class TargetOverrideNumber(NumberEntity):
 
     @property
     def native_value(self) -> float:
-        return self._coordinator.target_override_ml
+        return round(from_ml(self._coordinator.target_override_ml, self._coordinator.display_unit), 2)
 
     async def async_set_native_value(self, value: float) -> None:
-        await self._coordinator.async_set_target_override(value)
+        ml = to_ml(float(value), self._coordinator.display_unit)
+        await self._coordinator.async_set_target_override(ml)
