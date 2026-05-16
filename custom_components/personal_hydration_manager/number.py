@@ -8,7 +8,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, ENTITY_ID_PREFIX
 from .coordinator import HydrationCoordinator
 
 
@@ -37,6 +37,7 @@ class TargetOverrideNumber(NumberEntity):
     def __init__(self, coordinator: HydrationCoordinator) -> None:
         self._coordinator = coordinator
         self._attr_unique_id = f"{coordinator.entry_id}_target_override"
+        self.entity_id = f"number.{ENTITY_ID_PREFIX}_{coordinator.slug}_target_override"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, coordinator.entry_id)},
             name=coordinator.name,

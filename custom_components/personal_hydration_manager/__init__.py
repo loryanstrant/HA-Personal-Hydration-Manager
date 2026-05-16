@@ -21,6 +21,7 @@ from .const import (
     UNIT_ML,
     UNITS,
 )
+from .blueprints_install import async_install_blueprints
 from .coordinator import HydrationCoordinator
 from .frontend import async_register_frontend
 
@@ -65,6 +66,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the integration (services + frontend)."""
     hass.data.setdefault(DOMAIN, {})
     await async_register_frontend(hass)
+    await async_install_blueprints(hass)
 
     async def handle_log_drink(call: ServiceCall) -> None:
         profile = call.data[ATTR_PROFILE]
@@ -120,6 +122,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a profile config entry."""
     hass.data.setdefault(DOMAIN, {})
+
+    # Re-run frontend registration here. async_setup() may have been called
+    # before Lovelace finished loading, so the Lovelace resource step would
+    # have been skipped. Both helpers dedupe — calling again is cheap.
+    await async_register_frontend(hass)
+    await async_install_blueprints(hass)
+
     coordinator = HydrationCoordinator(hass, entry)
     await coordinator.async_initialize()
     hass.data[DOMAIN][entry.entry_id] = coordinator

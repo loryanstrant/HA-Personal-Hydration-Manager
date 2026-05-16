@@ -1,0 +1,138 @@
+blueprint:
+  name: Hydration — TTS Reminder
+  description: >-
+    Speaks a hydration status update via TTS — typically used to gently remind
+    someone hourly during their awake window.
+
+    The announcement names how far they've come, how much they have left, and
+    the recommended pace to stay on target. By default it stays quiet outside
+    the configured awake hours and skips announcements once the daily target
+    is met.
+  domain: automation
+  source_url: https://github.com/loryanstrant/HA-Personal-Hydration-Manager/blob/main/blueprints/automation/loryanstrant/hydration_tts_reminder.yaml
+  input:
+    name:
+      name: Person's name (used in the announcement)
+      default: ""
+      selector:
+        text:
+    tts_service:
+      name: TTS service
+      description: >-
+        e.g. tts.google_translate_say, tts.cloud_say, tts.piper.
+      selector:
+        text:
+    media_player:
+      name: Media player(s)
+      description: Where the announcement plays.
+      selector:
+        entity:
+          domain: media_player
+          multiple: true
+    consumed_sensor:
+      name: Consumed-today sensor
+      selector:
+        entity:
+          domain: sensor
+    target_sensor:
+      name: Daily target sensor
+      selector:
+        entity:
+          domain: sensor
+    remaining_sensor:
+      name: Remaining sensor
+      selector:
+        entity:
+          domain: sensor
+    pace_sensor:
+      name: Hourly pace sensor
+      selector:
+        entity:
+          domain: sensor
+    progress_sensor:
+      name: Progress sensor (percent)
+      selector:
+        entity:
+          domain: sensor
+    quiet_after_complete:
+      name: Skip when target already met
+      default: true
+      selector:
+        boolean:
+    earliest_hour:
+      name: Earliest hour to announce
+      default: 8
+      selector:
+        number:
+          min: 0
+          max: 23
+          mode: slider
+          unit_of_measurement: h
+    latest_hour:
+      name: Latest hour to announce
+      default: 21
+      selector:
+        number:
+          min: 0
+          max: 23
+          mode: slider
+          unit_of_measurement: h
+    triggers:
+      name: Trigger(s)
+      description: >-
+        When should the reminder play? A time-pattern trigger ("every hour at
+        minute 0") is the typical choice.
+      selector:
+        trigger:
+
+trigger: !input triggers
+
+variables:
+  person_name: !input name
+  tts_service: !input tts_service
+  consumed_sensor: !input consumed_sensor
+  target_sensor: !input target_sensor
+  remaining_sensor: !input remaining_sensor
+  pace_sensor: !input pace_sensor
+  progress_sensor: !input progress_sensor
+  quiet_after_complete: !input quiet_after_complete
+  earliest_hour: !input earliest_hour
+  latest_hour: !input latest_hour
+
+condition:
+  - condition: template
+    value_template: >-
+      {{ now().hour >= earliest_hour and now().hour <= latest_hour }}
+  - condition: template
+    value_template: >-
+      {{ not (quiet_after_complete and (states(progress_sensor) | float(0)) >= 100) }}
+
+action:
+  - variables:
+      progress_pct: "{{ states(progress_sensor) | float(0) | round(0) }}"
+      consumed_ml: "{{ states(consumed_sensor) | float(0) | round(0) }}"
+      target_ml: "{{ states(target_sensor) | float(0) | round(0) }}"
+      remaining_ml: "{{ states(remaining_sensor) | float(0) | round(0) }}"
+      pace_ml: "{{ states(pace_sensor) | float(0) | round(0) }}"
+      greet: "{{ (person_name + ', ') if person_name else '' }}"
+      sentence: >-
+        {%- if progress_pct < 25 -%}
+          {{ greet }}gentle reminder to drink some water. You've had
+          {{ consumed_ml }} millilitres so far, with {{ remaining_ml }} to go.
+          Try to drink about {{ pace_ml }} millilitres in the next hour.
+        {%- elif progress_pct < 75 -%}
+          {{ greet }}you're {{ progress_pct }} percent of the way there.
+          {{ remaining_ml }} millilitres left — aim for {{ pace_ml }} millilitres
+          this hour to stay on track.
+        {%- elif progress_pct < 100 -%}
+          Almost there{{ ' ' + person_name if person_name else '' }} — just
+          {{ remaining_ml }} millilitres left to hit your target.
+        {%- else -%}
+          {{ greet }}you've met your hydration target for today. Nice work.
+        {%- endif -%}
+  - service: "tts.{{ tts_service | regex_replace('^tts\\.', '') }}"
+    data:
+      entity_id: !input media_player
+      message: "{{ sentence }}"
+
+mode: single
