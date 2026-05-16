@@ -4,6 +4,10 @@ from __future__ import annotations
 DOMAIN = "personal_hydration_manager"
 PLATFORMS = ["sensor", "number"]
 
+# Short prefix for entity IDs (e.g. sensor.phm_alex_consumed_today).
+# Keeps profile entities grouped and easy to filter in the entity list.
+ENTITY_ID_PREFIX = "phm"
+
 CONF_NAME = "name"
 CONF_AGE = "age"
 CONF_GENDER = "gender"
@@ -13,6 +17,7 @@ CONF_DAY_START = "day_start"
 CONF_DAY_END = "day_end"
 CONF_SOURCE_SENSOR = "source_sensor"
 CONF_SOURCE_MODE = "source_mode"
+CONF_UNIT = "unit"
 
 GENDER_MALE = "male"
 GENDER_FEMALE = "female"
@@ -87,3 +92,23 @@ def to_ml(volume: float, unit: str) -> float:
     if unit == UNIT_FL_OZ:
         return volume * 29.5735
     return volume
+
+
+def from_ml(volume_ml: float, unit: str) -> float:
+    """Convert millilitres to the chosen display unit."""
+    if unit == UNIT_L:
+        return volume_ml / 1000.0
+    if unit == UNIT_FL_OZ:
+        return volume_ml / 29.5735
+    return volume_ml
+
+
+def unit_label(unit: str) -> str:
+    """Human-readable label for a unit value."""
+    if unit == UNIT_FL_OZ:
+        return "fl oz"
+    return unit  # mL or L
+
+def pace_unit_label(unit: str) -> str:
+    """Per-hour label for the hourly pace sensor."""
+    return f"{unit_label(unit)}/h"
