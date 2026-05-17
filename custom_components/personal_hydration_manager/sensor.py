@@ -85,8 +85,8 @@ class _BaseHydrationSensor(SensorEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, coordinator.entry_id)},
             name=coordinator.name,
-            manufacturer="Personal Hydration Manager",
-            model="NASEM AI baseline",
+            manufacturer="Loryan Strant",
+            model="Personal Hydration Manager",
         )
 
     async def async_added_to_hass(self) -> None:
@@ -128,7 +128,6 @@ class DailyTargetSensor(_VolumeSensor):
             "gender": c.gender,
             "pregnancy": c.pregnancy,
             "lactation": c.lactation,
-            "source": "NASEM Adequate Intake (Total Beverages)",
             "override_ml": c.target_override_ml or None,
             "target_ml": c.target_ml,
         }

@@ -10,7 +10,7 @@
 
 const CARD_TAG = "personal-hydration-card";
 const EDITOR_TAG = "personal-hydration-card-editor";
-const CARD_VERSION = "0.1.9";
+const CARD_VERSION = "0.1.10";
 
 const ML_PER_FL_OZ = 29.5735;
 
@@ -163,10 +163,6 @@ class PersonalHydrationCard extends HTMLElement {
           ${this._config.show_cup ? this._renderCup(progressPct, unit, consumedMl, targetMl) : ""}
           ${this._config.show_countdown ? this._renderCountdown(remainingMl, paceMl, unit) : ""}
           ${this._config.show_manual ? this._renderManual(unit) : ""}
-
-          <footer class="hyd-footer">
-            Targets from <a href="https://www.ncbi.nlm.nih.gov/books/NBK56068/" target="_blank" rel="noopener">NASEM Adequate Intake (Total Beverages)</a>
-          </footer>
         </div>
       </ha-card>
     `;
@@ -329,8 +325,6 @@ class PersonalHydrationCard extends HTMLElement {
         .hyd-btn:active { transform: translateY(0); }
         .hyd-btn-busy { opacity: 0.5; pointer-events: none; }
         .hyd-btn-custom { background: var(--secondary-background-color, #555); }
-        .hyd-footer { font-size: 0.75rem; color: var(--secondary-text-color, #888); text-align: center; }
-        .hyd-footer a { color: inherit; text-decoration: underline; }
         .hyd-error { color: var(--error-color, #db4437); text-align: center; }
       </style>
     `;
@@ -464,7 +458,7 @@ if (!window.customCards.find((c) => c.type === CARD_TAG)) {
   window.customCards.push({
     type: CARD_TAG,
     name: "Personal Hydration",
-    description: "Track water intake against the NASEM Adequate Intake baseline.",
+    description: "Track daily water intake per person.",
     preview: true,
     documentationURL:
       "https://github.com/loryanstrant/HA-Personal-Hydration-Manager#the-dashboard-card",

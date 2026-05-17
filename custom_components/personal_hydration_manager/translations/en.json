@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Add a hydration profile",
-        "description": "Each person gets their own profile, sensors, and dashboard card. Targets come from the NASEM Adequate Intake table.",
+        "description": "Each person gets their own profile, sensors, and dashboard card.",
         "data": {
           "name": "Name",
           "age": "Age",
