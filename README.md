@@ -54,7 +54,7 @@ Add one integration entry per person. Fields:
 
 | Field | Notes |
 |-------|-------|
-| Name | Used for entity IDs, e.g. `sensor.alex_consumed_today` |
+| Name | Used for entity IDs, e.g. `sensor.phm_alex_consumed_today` |
 | Age | Years |
 | Gender | Male / Female — selects the matching NASEM row |
 | Pregnancy | Overrides target to 2,400 mL |
@@ -68,14 +68,16 @@ You can change any of these later via the integration's **Configure** button.
 
 ## Entities created per profile
 
+All entities are prefixed with `phm_` so they group together in the entity list.
+
 | Entity | Unit | Description |
 |--------|------|-------------|
-| `sensor.<name>_daily_target` | mL | NASEM target (or override) |
-| `sensor.<name>_consumed_today` | mL | Total consumed today |
-| `sensor.<name>_remaining` | mL | Target − consumed (≥ 0) |
-| `sensor.<name>_hourly_pace` | mL/h | `remaining / hours_left_until_day_end` |
-| `sensor.<name>_progress` | % | `consumed / target` |
-| `number.<name>_target_override` | mL | Set > 0 to override NASEM; `0` to use NASEM |
+| `sensor.phm_<name>_daily_target` | mL | NASEM target (or override) |
+| `sensor.phm_<name>_consumed_today` | mL | Total consumed today |
+| `sensor.phm_<name>_remaining` | mL | Target − consumed (≥ 0) |
+| `sensor.phm_<name>_hourly_pace` | mL/h | `remaining / hours_left_until_day_end` |
+| `sensor.phm_<name>_progress` | % | `consumed / target` |
+| `number.phm_<name>_target_override` | mL | Set > 0 to override NASEM; `0` to use NASEM |
 
 ## Services
 
@@ -137,12 +139,12 @@ The visual editor exposes:
 
 ## Blueprints
 
-Two blueprints live in `blueprints/automation/loryanstrant/`:
+Two blueprints are bundled with the integration and installed automatically the first time you add it:
 
 - **`hydration_push_notification.yaml`** — sends a notification to a mobile device that requires the user to confirm they've had water (actionable notification).
 - **`hydration_tts_reminder.yaml`** — speaks the current status via TTS — typically used with an hourly trigger.
 
-Import via Settings → Automations → Blueprints → Import Blueprint, pasting the raw URL of each file.
+They appear under **Settings → Automations & Scenes → Blueprints → Hydration —** after the integration is set up (a restart may be required for the blueprint folder to be re-scanned). You can also re-import them manually from `blueprints/automation/loryanstrant/` in this repo.
 
 ## Calculation reference
 
