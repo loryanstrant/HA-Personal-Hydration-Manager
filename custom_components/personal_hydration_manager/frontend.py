@@ -22,10 +22,11 @@ from pathlib import Path
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
+from homeassistant.setup import async_when_setup
 
 _LOGGER = logging.getLogger(__name__)
 
-CARD_VERSION = "0.1.10"
+CARD_VERSION = "0.1.12"
 STATIC_URL_BASE = "/personal_hydration_manager_static"
 CARD_FILE = "personal-hydration-card.js"
 CARD_URL = f"{STATIC_URL_BASE}/{CARD_FILE}"
@@ -65,7 +66,16 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
     # 3. Belt-and-braces: register it in the Lovelace resources collection
     #    used by storage-mode dashboards. This is the same store HACS writes
     #    to and is what makes cards survive cache wipes and fresh dashboards.
-    await _async_register_lovelace_resource(hass)
+    #    If Lovelace hasn't loaded yet (cold-start race), defer until it has —
+    #    silently bailing here used to leave the resource permanently
+    #    unregistered until the next HA restart with the right ordering.
+    if hass.data.get("lovelace") is not None:
+        await _async_register_lovelace_resource(hass)
+    else:
+        async def _on_lovelace_ready(_hass: HomeAssistant, _component: str) -> None:
+            await _async_register_lovelace_resource(_hass)
+
+        async_when_setup(hass, "lovelace", _on_lovelace_ready)
 
 
 async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:

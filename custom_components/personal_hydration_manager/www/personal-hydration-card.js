@@ -10,7 +10,7 @@
 
 const CARD_TAG = "personal-hydration-card";
 const EDITOR_TAG = "personal-hydration-card-editor";
-const CARD_VERSION = "0.1.11";
+const CARD_VERSION = "0.1.12";
 
 const ML_PER_FL_OZ = 29.5735;
 
