@@ -1,9 +1,8 @@
 # Personal Hydration Manager
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
-![hacs validate](https://github.com/loryanstrant/HA-Personal-Hydration-Manager/actions/workflows/validate.yml/badge.svg)
 
-A Home Assistant integration to track daily water intake for one or more people in your household, with a built-in Lovelace card.
+A Home Assistant integration to track daily water intake for one or more people in your household, with a built-in dashboard card.
 
 Targets are derived from the **National Academies of Sciences, Engineering, and Medicine (NASEM)** *Adequate Intake (AI) for Total Beverages* table — the baseline for **liquid** intake by age and gender, excluding the ~20% of water humans get from solid food.
 
@@ -21,7 +20,7 @@ Targets are derived from the **National Academies of Sciences, Engineering, and 
 
 ## Features
 
-- **One profile per person** — each household member gets their own config entry, sensors, and dashboard card.
+- **Multiple profile support** — each household member can have their own config entry, sensors, and dashboard card.
 - **Smart pace calculation** — dynamic catch-up: as the day progresses, the recommended hourly pace adjusts based on what you've already drunk and how many hours remain until your usual bedtime.
 - **Three card views, mix-and-match** — animated cup fill, countdown + pace, and one-tap manual add.
 - **Visual card editor** with a preview tile in the dashboard card picker.
@@ -33,6 +32,9 @@ Targets are derived from the **National Academies of Sciences, Engineering, and 
 - **Metric default with mL ⇄ fl oz toggle** in the card editor.
 - **Daily reset at your configured start-of-day time**, persisted across HA restarts.
 
+<img width="521" height="420" alt="image" src="https://github.com/user-attachments/assets/5d6ba709-2798-47ec-b98f-a37cd73f2741" />
+
+
 ## Installation
 
 ### Via HACS (recommended)
@@ -42,7 +44,7 @@ Targets are derived from the **National Academies of Sciences, Engineering, and 
 3. Install **Personal Hydration Manager**, then **restart Home Assistant**.
 4. Settings → Devices & Services → **Add Integration** → Personal Hydration Manager.
 
-The dashboard card is registered automatically — no manual resource step.
+The dashboard card and blueprints are registered automatically — no manual resource step.
 
 ### Manual
 
@@ -156,7 +158,8 @@ The NASEM AI represents *Total Beverages* — water from all liquid sources. The
 
 ## Development
 
-The card is shipped pre-built as a single vanilla-JavaScript Web Component (no build step required). Source lives in `custom_components/personal_hydration_manager/www/personal-hydration-card.js`.
+<img width="256" height="256" alt="image" src="https://github.com/user-attachments/assets/ad5e2241-4bc4-45b4-876b-c12fbf62e2f1" />
+
 
 ## Contributing
 
