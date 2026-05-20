@@ -61,6 +61,7 @@ async def async_setup_entry(
         [
             DailyTargetSensor(coordinator),
             ConsumedTodaySensor(coordinator),
+            ManualConsumedSensor(coordinator),
             RemainingSensor(coordinator),
             HourlyPaceSensor(coordinator),
             ProgressSensor(coordinator),
@@ -147,6 +148,33 @@ class ConsumedTodaySensor(_VolumeSensor):
     @property
     def extra_state_attributes(self) -> dict:
         return {"consumed_ml": round(self._coordinator.consumed_ml, 1)}
+
+
+class ManualConsumedSensor(_VolumeSensor):
+    """Manual-only running total.
+
+    Always exposed regardless of source mode — it's the load-bearing
+    contributor in sum mode, and an at-a-glance "how much have I logged
+    by hand" figure in delta/absolute modes.
+    """
+
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_icon = "mdi:hand-water"
+
+    def __init__(self, coordinator: HydrationCoordinator) -> None:
+        super().__init__(coordinator, "manual_consumed", "Manual consumed")
+
+    @property
+    def native_value(self) -> float:
+        # getattr fallback: a partial HACS update could land sensor.py before
+        # coordinator.py is refreshed with the new field.
+        manual_ml = getattr(self._coordinator, "manual_consumed_ml", 0.0)
+        return round(_from_ml(manual_ml, _safe_display_unit(self._coordinator)), 2)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        manual_ml = getattr(self._coordinator, "manual_consumed_ml", 0.0)
+        return {"manual_consumed_ml": round(manual_ml, 1)}
 
 
 class RemainingSensor(_VolumeSensor):

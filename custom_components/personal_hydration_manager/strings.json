@@ -51,7 +51,8 @@
     "source_mode": {
       "options": {
         "absolute": "Absolute (sensor state = today's total)",
-        "delta": "Delta (sum positive increases)"
+        "delta": "Delta (sum positive increases)",
+        "sum": "Sum (manual entries + external sensor value)"
       }
     }
   },

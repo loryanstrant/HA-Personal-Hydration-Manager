@@ -28,6 +28,7 @@ from .const import (
     SIGNAL_UPDATE_FMT,
     SOURCE_MODE_ABSOLUTE,
     SOURCE_MODE_DELTA,
+    SOURCE_MODE_SUM,
     STORAGE_KEY_FMT,
     STORAGE_VERSION,
     UNIT_ML,
@@ -67,8 +68,16 @@ class HydrationCoordinator:
         self._unsub_pace = None
 
         self.consumed_ml: float = 0.0
+        # Running total of manual additions (log_drink / quick-add / set_consumed).
+        # Always tracked so the user can see how much they've logged by hand,
+        # but only used as a contributor to consumed_ml in SOURCE_MODE_SUM.
+        self.manual_consumed_ml: float = 0.0
         self.last_reset_date: str = dt_util.now().date().isoformat()
         self.target_override_ml: float = 0.0
+        # In delta mode this is the previous reading for delta calculation.
+        # In sum mode this is the latest known external reading that gets
+        # added to manual_consumed_ml. Survives bottle dropouts so the total
+        # holds steady at the last-known-good value until the next update.
         self._last_source_value: float | None = None
 
         cfg = {**entry.data, **entry.options}
@@ -130,6 +139,7 @@ class HydrationCoordinator:
         stored: dict[str, Any] | None = await self._store.async_load()
         if stored:
             self.consumed_ml = float(stored.get("consumed_ml", 0.0))
+            self.manual_consumed_ml = float(stored.get("manual_consumed_ml", 0.0))
             self.last_reset_date = stored.get(
                 "last_reset_date", dt_util.now().date().isoformat()
             )
@@ -181,26 +191,47 @@ class HydrationCoordinator:
         today = dt_util.now().date().isoformat()
         if self.last_reset_date != today:
             self.consumed_ml = 0.0
+            self.manual_consumed_ml = 0.0
             self.last_reset_date = today
             self._last_source_value = None
             await self._save()
 
     async def async_reset_today(self) -> None:
         self.consumed_ml = 0.0
+        self.manual_consumed_ml = 0.0
         self.last_reset_date = dt_util.now().date().isoformat()
         self._last_source_value = None
         await self._save()
         self._dispatch()
 
+    def _recompute_sum_consumed(self) -> None:
+        """Refresh consumed_ml from manual + external in sum mode."""
+        external = self._last_source_value or 0.0
+        self.consumed_ml = max(0.0, self.manual_consumed_ml + external)
+
     async def async_add_drink(self, volume: float, unit: str) -> None:
         await self._maybe_daily_reset()
-        self.consumed_ml = max(0.0, self.consumed_ml + to_ml(float(volume), unit))
+        added_ml = to_ml(float(volume), unit)
+        # Manual sensor mirrors every hand-entered drink regardless of mode —
+        # useful as transparency in delta/absolute and load-bearing in sum.
+        self.manual_consumed_ml = max(0.0, self.manual_consumed_ml + added_ml)
+        if self.source_mode == SOURCE_MODE_SUM:
+            self._recompute_sum_consumed()
+        else:
+            self.consumed_ml = max(0.0, self.consumed_ml + added_ml)
         await self._save()
         self._dispatch()
 
     async def async_set_consumed(self, volume: float, unit: str) -> None:
         await self._maybe_daily_reset()
-        self.consumed_ml = max(0.0, to_ml(float(volume), unit))
+        target_ml = max(0.0, to_ml(float(volume), unit))
+        if self.source_mode == SOURCE_MODE_SUM:
+            # Solve for manual so that manual + external == target.
+            external = self._last_source_value or 0.0
+            self.manual_consumed_ml = max(0.0, target_ml - external)
+            self._recompute_sum_consumed()
+        else:
+            self.consumed_ml = target_ml
         await self._save()
         self._dispatch()
 
@@ -231,6 +262,14 @@ class HydrationCoordinator:
 
         if self.source_mode == SOURCE_MODE_ABSOLUTE:
             self.consumed_ml = max(0.0, value)
+            self._last_source_value = value
+        elif self.source_mode == SOURCE_MODE_SUM:
+            # Sum mode: external reading is added to manual_consumed_ml.
+            # Holding _last_source_value at the latest known value means a
+            # bottle dropout leaves the total unchanged until it reports again,
+            # which is exactly the resilience the user is after.
+            self._last_source_value = value
+            self._recompute_sum_consumed()
         else:
             # Delta mode: add positive deltas only.
             if self._last_source_value is not None and value >= self._last_source_value:
@@ -246,6 +285,7 @@ class HydrationCoordinator:
         await self._store.async_save(
             {
                 "consumed_ml": self.consumed_ml,
+                "manual_consumed_ml": self.manual_consumed_ml,
                 "last_reset_date": self.last_reset_date,
                 "target_override_ml": self.target_override_ml,
                 "last_source_value": self._last_source_value,
