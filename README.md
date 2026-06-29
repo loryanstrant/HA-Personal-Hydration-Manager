@@ -1,6 +1,14 @@
 # Personal Hydration Manager
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
+[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5?style=flat-square)](https://github.com/hacs/integration)
+[![Release](https://img.shields.io/github/v/release/loryanstrant/HA-Personal-Hydration-Manager?style=flat-square)](https://github.com/loryanstrant/HA-Personal-Hydration-Manager/releases)
+[![Release date](https://img.shields.io/github/release-date/loryanstrant/HA-Personal-Hydration-Manager?style=flat-square)](https://github.com/loryanstrant/HA-Personal-Hydration-Manager/releases)
+[![Downloads](https://img.shields.io/github/downloads/loryanstrant/HA-Personal-Hydration-Manager/total?style=flat-square)](https://github.com/loryanstrant/HA-Personal-Hydration-Manager/releases)
+[![License](https://img.shields.io/github/license/loryanstrant/HA-Personal-Hydration-Manager?style=flat-square)](LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/loryanstrant/HA-Personal-Hydration-Manager?style=flat-square)](https://github.com/loryanstrant/HA-Personal-Hydration-Manager/commits)
+[![Stars](https://img.shields.io/github/stars/loryanstrant/HA-Personal-Hydration-Manager?style=flat-square)](https://github.com/loryanstrant/HA-Personal-Hydration-Manager/stargazers)
+
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=loryanstrant&repository=HA-Personal-Hydration-Manager&category=integration)
 
 A Home Assistant integration to track daily water intake for one or more people in your household, with a built-in dashboard card.
 
@@ -33,7 +41,6 @@ Targets are derived from the **National Academies of Sciences, Engineering, and 
 - **Daily reset at your configured start-of-day time**, persisted across HA restarts.
 
 <img width="521" height="420" alt="image" src="https://github.com/user-attachments/assets/5d6ba709-2798-47ec-b98f-a37cd73f2741" />
-
 
 ## Installation
 
@@ -159,7 +166,6 @@ The NASEM AI represents *Total Beverages* — water from all liquid sources. The
 ## Development
 
 <img width="256" height="256" alt="image" src="https://github.com/user-attachments/assets/ad5e2241-4bc4-45b4-876b-c12fbf62e2f1" />
-
 
 ## Contributing
 
