@@ -9,7 +9,7 @@ blueprint:
     the configured awake hours and skips announcements once the daily target
     is met.
   domain: automation
-  source_url: https://github.com/loryanstrant/personal-hydration-manager/blob/main/blueprints/automation/loryanstrant/hydration_tts_reminder.yaml
+  source_url: https://github.com/loryanstrant/HA-Personal-Hydration-Manager/blob/main/blueprints/automation/loryanstrant/hydration_tts_reminder.yaml
   input:
     name:
       name: Person's name (used in the announcement)
