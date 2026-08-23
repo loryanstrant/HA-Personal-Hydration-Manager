@@ -14,6 +14,25 @@ const CARD_VERSION = "0.2.0";
 
 const ML_PER_FL_OZ = 29.5735;
 
+// Shared by the card and its editor. The editor used to omit these, so a
+// config written without `show_cup` showed the box unchecked while the card
+// rendered the cup — the editor contradicted what you could see.
+const DEFAULTS = {
+  profile: "",
+  show_title: true,
+  show_cup: true,
+  show_countdown: true,
+  show_manual: true,
+  unit: "mL",
+  quick_add: [200, 300, 500],
+};
+
+// The integration pins entity_id to sensor.phm_<slug>_<key> (see sensor.py),
+// and the card string-builds all five of its entities from the stored slug.
+// The editor reads this pair back to find the profiles that exist.
+const PROFILE_PREFIX = "sensor.phm_";
+const PROFILE_SUFFIX = "_daily_target";
+
 function mlToDisplay(ml, unit) {
   if (unit === "fl_oz") return (ml / ML_PER_FL_OZ).toFixed(1);
   if (ml >= 1000) return (ml / 1000).toFixed(2);
@@ -69,16 +88,7 @@ class PersonalHydrationCard extends HTMLElement {
 
   setConfig(config) {
     if (!config) throw new Error("Invalid configuration");
-    this._config = {
-      profile: "",
-      show_title: true,
-      show_cup: true,
-      show_countdown: true,
-      show_manual: true,
-      unit: "mL",
-      quick_add: [200, 300, 500],
-      ...config,
-    };
+    this._config = { ...DEFAULTS, ...config };
     this._render();
   }
 
@@ -331,116 +341,224 @@ class PersonalHydrationCard extends HTMLElement {
   }
 }
 
-/* ---------- Visual editor ---------- */
+/* ---------- Visual editor ----------
+ *
+ * Built on ha-form and Home Assistant's selectors rather than hand-built DOM.
+ * Two reasons, one cosmetic and one structural. The editor renders inside HA's
+ * card dialog surrounded by Material fields, and raw <select>/<input> match
+ * neither them nor the active theme. And the hand-built version assigned
+ * shadowRoot.innerHTML on every `set hass` — which HA fires several times a
+ * second — so any control the user had open was destroyed underneath them.
+ * Here the form element is created once and thereafter only .hass, .schema and
+ * .data are assigned, so Lit patches in place and there is nothing to blow away.
+ */
+
+const EDITOR_LABELS = {
+  profile: "Person",
+  title: "Card title (optional)",
+  show_title: "Show the name",
+  show_cup: "Show the cup",
+  show_countdown: "Show the countdown and pace",
+  show_manual: "Show the quick-add buttons",
+  unit: "Units",
+  quick_add: "Quick-add buttons",
+};
+
+// ha-form renders the raw key name when it cannot find a label, so this map is
+// required rather than decorative.
+const EDITOR_HELPERS = {
+  profile: "Whose hydration this card shows. Profiles come from the Personal Hydration Manager integration.",
+  title: "Leave blank to use the person's name.",
+  quick_add: "Always in millilitres, even when the card is showing fluid ounces.",
+};
+
+const NO_PROFILES_HELPER =
+  "No hydration profiles yet — add one under Settings → Devices & Services → Personal Hydration Manager.";
+
+// Bare numbers, not "200 mL": a typed-in custom value renders as whatever was
+// typed, so a unit suffix on the presets alone makes the chip row read
+// "200 mL · 300 · 500 mL". The unit is stated once, in the helper text.
+// The card's three defaults are all in here so the common case is a tap.
+const QUICK_ADD_PRESETS = [150, 200, 250, 300, 330, 500, 750, 1000];
+
+/** The select selector deals in strings; the config stores integers. */
+function normaliseQuickAdd(values) {
+  const list = (Array.isArray(values) ? values : [])
+    .map((value) => parseInt(String(value).trim(), 10))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  return list.length ? list : [...DEFAULTS.quick_add];
+}
+
+function editorSchema(candidates) {
+  return [
+    // A named list, not an entity picker. You are choosing a person from the
+    // household, and HA's entity picker leads with the entity's own name — so
+    // every row would read "Daily target" with the person relegated to the
+    // second line, which is the opposite emphasis from the one that matters.
+    // The options carry the stored slug as their value, so nothing has to be
+    // translated on the way in or out.
+    { name: "profile", selector: { select: { mode: "dropdown", options: candidates } } },
+    { name: "title", selector: { text: {} } },
+    {
+      name: "",
+      type: "grid",
+      schema: [
+        { name: "show_title", selector: { boolean: {} } },
+        { name: "show_cup", selector: { boolean: {} } },
+        { name: "show_countdown", selector: { boolean: {} } },
+        { name: "show_manual", selector: { boolean: {} } },
+      ],
+    },
+    {
+      name: "unit",
+      selector: { select: { mode: "dropdown", options: [
+        { value: "mL", label: "Metric (mL / L)" },
+        { value: "fl_oz", label: "Imperial (fl oz)" },
+      ] } },
+    },
+    {
+      name: "quick_add",
+      selector: { select: {
+        multiple: true,
+        custom_value: true,
+        options: QUICK_ADD_PRESETS.map((ml) => ({ value: String(ml), label: String(ml) })),
+      } },
+    },
+  ];
+}
+
+/**
+ * Force the frontend chunk that defines ha-form and the entity picker.
+ *
+ * In practice the editor is only ever built from the card dialog, which has
+ * already loaded that chunk — but this is Mushroom's belt-and-braces and costs
+ * nothing. `window.customElements` is re-read on every call rather than
+ * captured: Home Assistant swaps it for a scoped-registry polyfill while its
+ * core bundle boots, which is also why this must never be
+ * `customElements.whenDefined()` at module top level — that would bind to the
+ * native registry's method and might never fire.
+ */
+function loadHaComponents() {
+  const registry = window.customElements;
+  if (!registry.get("ha-form")) {
+    const tile = registry.get("hui-tile-card");
+    if (tile && tile.getConfigElement) tile.getConfigElement();
+  }
+  if (!registry.get("ha-entity-picker")) {
+    const entities = registry.get("hui-entities-card");
+    if (entities && entities.getConfigElement) entities.getConfigElement();
+  }
+}
 
 class PersonalHydrationCardEditor extends HTMLElement {
+  // Light DOM, matching the sibling laundry-weather and ha-jokes cards: the
+  // dialog styles the editor's own children, and the entity picker reads
+  // `hass` from a Lit context provider further up the tree.
   constructor() {
     super();
-    this.attachShadow({ mode: "open" });
     this._config = null;
     this._hass = null;
+    this._form = null;
   }
 
   setConfig(config) {
-    this._config = { ...config };
+    this._config = { ...DEFAULTS, ...config };
     this._render();
   }
 
+  // Safe to render on every tick, unlike the hand-built version this replaced:
+  // nothing is destroyed, the form just receives new values.
   set hass(hass) {
     this._hass = hass;
     this._render();
   }
 
-  _profileOptions() {
+  connectedCallback() {
+    loadHaComponents();
+  }
+
+  /** The configured profiles, as {value: slug, label: person's name}. */
+  _candidates() {
     if (!this._hass) return [];
-    return Object.values(this._hass.states || {})
-      .filter((s) => s.entity_id.startsWith("sensor.phm_") && s.entity_id.endsWith("_daily_target"))
-      .map((s) => {
-        const slug = s.entity_id.replace("sensor.phm_", "").replace("_daily_target", "");
-        return { value: slug, label: s.attributes?.friendly_name?.replace(" Daily target", "") || slug };
-      });
+    const states = this._hass.states || {};
+    return Object.keys(states)
+      .filter((id) => id.startsWith(PROFILE_PREFIX) && id.endsWith(PROFILE_SUFFIX))
+      .sort()
+      .map((id) => ({
+        value: id.slice(PROFILE_PREFIX.length, id.length - PROFILE_SUFFIX.length),
+        // friendly_name is "<Person> Daily target"; the sensor's own name is
+        // noise here. Falls back to the entity ID if it has been renamed.
+        label: (states[id].attributes?.friendly_name || id).replace(/ Daily target$/, ""),
+      }));
+  }
+
+  _schema() {
+    // Rebuilt only when the candidate list actually changes, so ha-form is not
+    // handed a fresh array object on every state update.
+    const candidates = this._candidates();
+    const key = candidates.map((c) => `${c.value}:${c.label}`).join(",");
+    if (!this._schemaCache || this._schemaKey !== key) {
+      this._schemaKey = key;
+      this._schemaCache = editorSchema(candidates);
+    }
+    return this._schemaCache;
+  }
+
+  _formData() {
+    const data = { ...this._config };
+    // The select speaks strings; the config stores integers.
+    data.quick_add = normaliseQuickAdd(this._config.quick_add).map(String);
+    return data;
+  }
+
+  _label(schema) {
+    return EDITOR_LABELS[schema.name] || "";
+  }
+
+  _helper(schema) {
+    if (schema.name === "profile" && this._candidates().length === 0) {
+      return NO_PROFILES_HELPER;
+    }
+    return EDITOR_HELPERS[schema.name] || "";
   }
 
   _render() {
-    if (!this._config) return;
-    const profiles = this._profileOptions();
-    const profileOptions = profiles
-      .map(
-        (p) =>
-          `<option value="${p.value}" ${p.value === this._config.profile ? "selected" : ""}>${p.label}</option>`
-      )
-      .join("");
+    // ha-form needs hass to resolve its selectors, so wait for it.
+    if (!this._hass || !this._config) return;
 
-    this.shadowRoot.innerHTML = `
-      <style>
-        :host { display: block; }
-        .row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-        label { font-size: 0.85rem; color: var(--secondary-text-color, #888); }
-        input[type="text"], select {
-          padding: 8px; border-radius: 6px; border: 1px solid var(--divider-color, #ccc);
-          background: var(--card-background-color, #fff); color: var(--primary-text-color, #000);
-          font: inherit;
-        }
-        .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .check { display: flex; align-items: center; gap: 6px; }
-        .hint { font-size: 0.75rem; color: var(--secondary-text-color, #888); }
-      </style>
-      <div class="row">
-        <label>Profile</label>
-        <select id="profile">
-          <option value="">— pick a profile —</option>
-          ${profileOptions}
-        </select>
-        <span class="hint">Profiles come from the Personal Hydration Manager integration.</span>
-      </div>
+    if (!this._form) {
+      const form = document.createElement("ha-form");
+      form.computeLabel = (schema) => this._label(schema);
+      form.computeHelper = (schema) => this._helper(schema);
+      form.addEventListener("value-changed", (event) => this._onValueChanged(event));
+      this.appendChild(form);
+      this._form = form;
+    }
 
-      <div class="row">
-        <label>Display views</label>
-        <div class="checks">
-          <label class="check"><input type="checkbox" id="show_title" ${this._config.show_title !== false ? "checked" : ""}/> Title (person's name)</label>
-          <label class="check"><input type="checkbox" id="show_cup" ${this._config.show_cup ? "checked" : ""}/> Cup fill</label>
-          <label class="check"><input type="checkbox" id="show_countdown" ${this._config.show_countdown ? "checked" : ""}/> Countdown + pace</label>
-          <label class="check"><input type="checkbox" id="show_manual" ${this._config.show_manual ? "checked" : ""}/> Manual add buttons</label>
-        </div>
-      </div>
-
-      <div class="row">
-        <label>Units</label>
-        <select id="unit">
-          <option value="mL" ${this._config.unit === "mL" ? "selected" : ""}>Metric (mL / L)</option>
-          <option value="fl_oz" ${this._config.unit === "fl_oz" ? "selected" : ""}>Imperial (fl oz)</option>
-        </select>
-      </div>
-
-      <div class="row">
-        <label>Quick-add buttons (mL, comma-separated)</label>
-        <input type="text" id="quick_add" value="${(this._config.quick_add || [200, 300, 500]).join(", ")}" />
-      </div>
-    `;
-
-    this.shadowRoot.getElementById("profile").addEventListener("change", (e) =>
-      this._update("profile", e.target.value)
-    );
-    ["show_title", "show_cup", "show_countdown", "show_manual"].forEach((k) => {
-      this.shadowRoot.getElementById(k).addEventListener("change", (e) =>
-        this._update(k, e.target.checked)
-      );
-    });
-    this.shadowRoot.getElementById("unit").addEventListener("change", (e) =>
-      this._update("unit", e.target.value)
-    );
-    this.shadowRoot.getElementById("quick_add").addEventListener("change", (e) => {
-      const list = e.target.value
-        .split(",")
-        .map((s) => parseInt(s.trim(), 10))
-        .filter((n) => isFinite(n) && n > 0);
-      this._update("quick_add", list.length ? list : [200, 300, 500]);
-    });
+    this._form.hass = this._hass;
+    this._form.schema = this._schema();
+    this._form.data = this._formData();
   }
 
-  _update(key, value) {
-    this._config = { ...this._config, [key]: value };
-    fireEvent(this, "config-changed", { config: this._config });
+  _onValueChanged(event) {
+    // Stop the inner event so only our config-changed reaches the editor host.
+    event.stopPropagation();
+    const value = { ...event.detail.value };
+
+    // A profile whose sensors have gone (integration removed, entity renamed)
+    // matches no option, so the dropdown renders blank. Without this, editing
+    // any *other* field would read that blank as the user clearing the profile
+    // and silently drop it. Only restore when the stored value is genuinely
+    // unrepresentable — clearing a profile that IS in the list is honoured.
+    if (!value.profile && this._config.profile) {
+      const known = this._candidates().some((c) => c.value === this._config.profile);
+      if (!known) value.profile = this._config.profile;
+    }
+
+    value.quick_add = normaliseQuickAdd(value.quick_add);
+
+    this._config = value;
+    fireEvent(this, "config-changed", { config: value });
   }
 }
 

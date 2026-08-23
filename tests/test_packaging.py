@@ -97,6 +97,44 @@ def test_card_version_matches_manifest(card: Path | None) -> None:
     )
 
 
+def test_the_cache_buster_matches_the_manifest() -> None:
+    """`frontend.py` stamps `?v=` on the card's Lovelace resource URL.
+
+    It is a third, easily-missed copy of the version. If it lags behind the
+    manifest the resource URL does not change between releases, so browsers
+    keep serving the card they already cached and the update appears not to
+    have landed at all.
+    """
+    source = (COMPONENT / "frontend.py").read_text(encoding="utf-8")
+    found = re.search(r'^CARD_VERSION\s*=\s*"([^"]+)"', source, re.M)
+    assert found, "frontend.py declares no CARD_VERSION"
+    assert found.group(1) == _manifest()["version"], (
+        f"frontend.py cache-buster is at {found.group(1)}, "
+        f"manifest is at {_manifest()['version']}"
+    )
+
+
+def test_the_editor_uses_no_raw_form_controls() -> None:
+    """The card editor is built on ha-form, not hand-built DOM.
+
+    Two faults are being held off here. Browser-default controls do not match
+    the Material fields surrounding them in Home Assistant's card dialog or
+    follow the active theme; and a hand-built editor rebuilds its subtree on
+    every `set hass` — which HA fires several times a second — destroying
+    whichever control the user has open.
+    """
+    source = (WWW / "personal-hydration-card.js").read_text(encoding="utf-8")
+    editor = source.split("/* ---------- Visual editor")[1]
+    # Strip comments before looking, or the explanation above trips its own test.
+    editor = re.sub(r"/\*.*?\*/", "", editor, flags=re.S)
+    editor = re.sub(r"^\s*(//|\*).*$", "", editor, flags=re.M)
+
+    offenders = re.findall(r"<(?:select|input)\b|createElement\(\s*[\"'](?:select|input)", editor)
+    assert not offenders, f"raw form controls in the editor: {offenders}"
+    assert 'createElement("ha-form")' in editor, "the editor does not build an ha-form"
+    assert "innerHTML" not in editor, "the editor assigns innerHTML somewhere"
+
+
 def test_the_card_registers_its_elements() -> None:
     """A card that defines no custom element silently does nothing."""
     source = (WWW / "personal-hydration-card.js").read_text(encoding="utf-8")
