@@ -12,7 +12,7 @@ blueprint:
     Pair this with any trigger you like (e.g. a time pattern every hour, or
     a numeric_state trigger when progress falls below a threshold).
   domain: automation
-  source_url: https://github.com/loryanstrant/personal-hydration-manager/blob/main/blueprints/automation/loryanstrant/hydration_push_notification.yaml
+  source_url: https://github.com/loryanstrant/HA-Personal-Hydration-Manager/blob/main/blueprints/automation/loryanstrant/hydration_push_notification.yaml
   input:
     profile:
       name: Hydration profile

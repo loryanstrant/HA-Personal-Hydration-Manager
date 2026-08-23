@@ -15,6 +15,18 @@
           "source_sensor": "Optional source sensor",
           "source_mode": "Source mode",
           "unit": "Display unit"
+        },
+        "data_description": {
+          "name": "Whose profile this is. It names the sensors and appears on the card, so use the name you'd want to read on your dashboard.",
+          "age": "Used to look up the recommended daily intake. The recommendation changes at ages 4, 9, 14 and 19.",
+          "gender": "Used with age to look up the recommended daily intake. From age 9 the recommendation differs; below that it is the same for everyone.",
+          "pregnancy": "Replaces the age and gender recommendation with a flat 2,400 mL a day.",
+          "lactation": "Replaces the age and gender recommendation with a flat 3,000 mL a day. Takes precedence over pregnancy if both are ticked.",
+          "day_start": "When today's total resets to zero. Set this to roughly when you wake up, so a late-night glass still counts towards the right day.",
+          "day_end": "When you stop counting for the day. The 'to stay on track' pace is how much you'd need to drink each hour between now and this time to reach the target.",
+          "source_sensor": "A sensor that already knows how much you've drunk — a smart bottle, for example. Leave this empty to log every drink by hand from the card or an automation.",
+          "source_mode": "How to read the sensor above. Absolute: the sensor already shows today's running total, so use it as-is. Delta: the sensor counts up and resets unpredictably, so only add its increases. Sum: add the sensor's reading to whatever you've logged by hand.",
+          "unit": "The units your figures are shown in. This changes the display only — nothing about how the total is stored or calculated."
         }
       }
     },
@@ -26,6 +38,7 @@
     "step": {
       "init": {
         "title": "Edit hydration profile",
+        "description": "Changes apply straight away. Today's running total is not reset.",
         "data": {
           "name": "Name",
           "age": "Age",
@@ -37,6 +50,18 @@
           "source_sensor": "Optional source sensor",
           "source_mode": "Source mode",
           "unit": "Display unit"
+        },
+        "data_description": {
+          "name": "Whose profile this is. It names the sensors and appears on the card, so use the name you'd want to read on your dashboard.",
+          "age": "Used to look up the recommended daily intake. The recommendation changes at ages 4, 9, 14 and 19.",
+          "gender": "Used with age to look up the recommended daily intake. From age 9 the recommendation differs; below that it is the same for everyone.",
+          "pregnancy": "Replaces the age and gender recommendation with a flat 2,400 mL a day.",
+          "lactation": "Replaces the age and gender recommendation with a flat 3,000 mL a day. Takes precedence over pregnancy if both are ticked.",
+          "day_start": "When today's total resets to zero. Set this to roughly when you wake up, so a late-night glass still counts towards the right day.",
+          "day_end": "When you stop counting for the day. The 'to stay on track' pace is how much you'd need to drink each hour between now and this time to reach the target.",
+          "source_sensor": "A sensor that already knows how much you've drunk — a smart bottle, for example. Leave this empty to log every drink by hand from the card or an automation.",
+          "source_mode": "How to read the sensor above. Absolute: the sensor already shows today's running total, so use it as-is. Delta: the sensor counts up and resets unpredictably, so only add its increases. Sum: add the sensor's reading to whatever you've logged by hand.",
+          "unit": "The units your figures are shown in. This changes the display only — nothing about how the total is stored or calculated."
         }
       }
     }
@@ -51,7 +76,8 @@
     "source_mode": {
       "options": {
         "absolute": "Absolute (sensor state = today's total)",
-        "delta": "Delta (sum positive increases)"
+        "delta": "Delta (sum positive increases)",
+        "sum": "Sum (manual entries + external sensor value)"
       }
     }
   },
