@@ -64,6 +64,11 @@ class PersonalHydrationCard extends HTMLElement {
     this._config = null;
     this._hass = null;
     this._tickTimer = null;
+    // Inline custom-amount entry, replacing the browser prompt() box.
+    this._customOpen = false;
+    this._customValue = "";
+    this._customError = "";
+    this._renderPending = false;
   }
 
   static getStubConfig(hass) {
@@ -120,8 +125,21 @@ class PersonalHydrationCard extends HTMLElement {
     return this._hass?.states?.[entity_id];
   }
 
-  _render() {
+  _render(force) {
     if (!this._config || !this._hass) return;
+
+    // The custom-amount field is a live input inside this subtree, and this
+    // method replaces the subtree wholesale. Home Assistant assigns `hass`
+    // several times a second and the tick timer fires every 30s, so rendering
+    // while it is open would destroy it mid-typing. Hold off until it closes,
+    // then catch up. The figures freeze for the few seconds it is open, which
+    // is a better trade than the field vanishing under the user's hands.
+    if (this._customOpen && !force) {
+      this._renderPending = true;
+      return;
+    }
+    this._renderPending = false;
+
     const profile = this._config.profile;
     if (!profile) {
       this._renderError("Pick a profile in the card editor.");
@@ -241,7 +259,7 @@ class PersonalHydrationCard extends HTMLElement {
   }
 
   _renderManual(unit) {
-    const buttons = (this._config.quick_add || [200, 300, 500])
+    const buttons = (this._config.quick_add || DEFAULTS.quick_add)
       .map(
         (mlValue) => `
         <button type="button" class="hyd-btn" data-volume="${mlValue}">
@@ -250,50 +268,127 @@ class PersonalHydrationCard extends HTMLElement {
       `
       )
       .join("");
+
+    if (!this._customOpen) {
+      return `
+        <div class="hyd-manual">
+          ${buttons}
+          <button type="button" class="hyd-btn hyd-btn-custom" data-custom="1">
+            + Custom…
+          </button>
+        </div>
+      `;
+    }
+
+    // The word, not the symbol — "fl oz" and "mL" both read as themselves.
+    const word = unit === "fl_oz" ? "fl oz" : "mL";
     return `
       <div class="hyd-manual">
         ${buttons}
-        <button type="button" class="hyd-btn hyd-btn-custom" data-custom="1">
-          + Custom…
-        </button>
       </div>
+      <div class="hyd-custom" role="group" aria-label="Add a custom amount">
+        <div class="hyd-custom-field">
+          <input type="number" id="hyd-custom-amount" class="hyd-custom-input"
+                 inputmode="decimal" min="0" step="any" autocomplete="off"
+                 aria-label="Amount in ${word}"
+                 aria-invalid="${this._customError ? "true" : "false"}" />
+          <span class="hyd-custom-unit" aria-hidden="true">${word}</span>
+        </div>
+        <button type="button" class="hyd-btn" data-confirm="1">Add</button>
+        <button type="button" class="hyd-btn hyd-btn-custom" data-cancel="1">Cancel</button>
+      </div>
+      ${this._customError ? `<div class="hyd-custom-error" role="alert">${this._customError}</div>` : ""}
     `;
   }
 
   _wireManualButtons() {
-    this.shadowRoot.querySelectorAll(".hyd-btn").forEach((btn) => {
+    const root = this.shadowRoot;
+    root.querySelectorAll(".hyd-btn").forEach((btn) => {
       btn.addEventListener("click", () => this._handleManualClick(btn));
     });
+
+    const field = root.getElementById("hyd-custom-amount");
+    if (!field) return;
+    field.value = this._customValue ?? "";
+    field.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        this._confirmCustom();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        this._closeCustom();
+      }
+    });
+    // Remember what has been typed, so a re-render after closing (or an error)
+    // does not silently discard it.
+    field.addEventListener("input", () => { this._customValue = field.value; });
+
+    // Focus on the next frame, not now. The button that opened this field was
+    // removed by the same render, and the browser resets focus to <body> as
+    // that click finishes — which would undo a synchronous focus() here and
+    // leave the user having to tap the field a second time.
+    requestAnimationFrame(() => field.focus());
+  }
+
+  _openCustom() {
+    this._customOpen = true;
+    this._customError = "";
+    this._customValue = "";
+    this._render(true);
+  }
+
+  _closeCustom() {
+    this._customOpen = false;
+    this._customError = "";
+    this._customValue = "";
+    this._render();
+  }
+
+  async _confirmCustom() {
+    const parsed = parseFloat(this._customValue);
+    if (!isFinite(parsed) || parsed <= 0) {
+      this._customError = "Enter a number bigger than zero.";
+      this._render(true);
+      return;
+    }
+    const volumeMl = this._config.unit === "fl_oz" ? parsed * ML_PER_FL_OZ : parsed;
+    this._customOpen = false;
+    this._customError = "";
+    this._customValue = "";
+    this._render();
+    await this._logDrink(volumeMl);
   }
 
   async _handleManualClick(btn) {
-    const profile = this._config.profile;
-    if (!profile || !this._hass) return;
-
-    let volumeMl;
     if (btn.dataset.custom) {
-      const raw = window.prompt(
-        `Add how much? (${this._config.unit === "fl_oz" ? "fl oz" : "mL"})`,
-        ""
-      );
-      if (!raw) return;
-      const parsed = parseFloat(raw);
-      if (!isFinite(parsed) || parsed <= 0) return;
-      volumeMl = this._config.unit === "fl_oz" ? parsed * ML_PER_FL_OZ : parsed;
-    } else {
-      volumeMl = Number(btn.dataset.volume);
+      this._openCustom();
+      return;
+    }
+    if (btn.dataset.cancel) {
+      this._closeCustom();
+      return;
+    }
+    if (btn.dataset.confirm) {
+      await this._confirmCustom();
+      return;
     }
 
     btn.classList.add("hyd-btn-busy");
     try {
-      await this._hass.callService("personal_hydration_manager", "log_drink", {
-        profile,
-        volume: volumeMl,
-        unit: "mL",
-      });
+      await this._logDrink(Number(btn.dataset.volume));
     } finally {
       setTimeout(() => btn.classList.remove("hyd-btn-busy"), 400);
     }
+  }
+
+  async _logDrink(volumeMl) {
+    const profile = this._config.profile;
+    if (!profile || !this._hass) return;
+    await this._hass.callService("personal_hydration_manager", "log_drink", {
+      profile,
+      volume: volumeMl,
+      unit: "mL",
+    });
   }
 
   _styles() {
@@ -334,8 +429,48 @@ class PersonalHydrationCard extends HTMLElement {
         .hyd-btn:hover { transform: translateY(-1px); }
         .hyd-btn:active { transform: translateY(0); }
         .hyd-btn-busy { opacity: 0.5; pointer-events: none; }
-        .hyd-btn-custom { background: var(--secondary-background-color, #555); }
+        .hyd-btn-custom {
+          background: var(--secondary-background-color, #555);
+          color: var(--primary-text-color, #fff);
+        }
         .hyd-error { color: var(--error-color, #db4437); text-align: center; }
+
+        /* Inline custom amount. Wraps to its own rows at narrow widths rather
+           than overflowing — the field keeps a sane minimum and the two
+           buttons drop beneath it. */
+        .hyd-custom {
+          display: flex; flex-wrap: wrap; gap: 8px;
+          align-items: center; justify-content: center;
+        }
+        .hyd-custom-field {
+          display: flex; align-items: center; gap: 6px; flex: 1 1 140px;
+          min-width: 120px; max-width: 220px;
+          border: 1px solid var(--divider-color, #ccc); border-radius: 16px;
+          padding: 4px 12px;
+          background: var(--card-background-color, #fff);
+        }
+        .hyd-custom-field:focus-within {
+          border-color: var(--primary-color, #2196f3);
+          box-shadow: 0 0 0 1px var(--primary-color, #2196f3);
+        }
+        .hyd-custom-input {
+          flex: 1 1 auto; width: 100%; min-width: 0;
+          border: none; outline: none; background: none;
+          color: var(--primary-text-color, #000);
+          font: inherit; font-size: 0.95rem; padding: 4px 0;
+          -moz-appearance: textfield;
+        }
+        .hyd-custom-input::-webkit-outer-spin-button,
+        .hyd-custom-input::-webkit-inner-spin-button {
+          -webkit-appearance: none; margin: 0;
+        }
+        .hyd-custom-unit {
+          font-size: 0.8rem; color: var(--secondary-text-color, #888); flex: 0 0 auto;
+        }
+        .hyd-custom-error {
+          font-size: 0.8rem; text-align: center;
+          color: var(--error-color, #db4437);
+        }
       </style>
     `;
   }
