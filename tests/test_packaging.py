@@ -135,6 +135,18 @@ def test_the_editor_uses_no_raw_form_controls() -> None:
     assert "innerHTML" not in editor, "the editor assigns innerHTML somewhere"
 
 
+def test_the_card_asks_for_input_without_a_browser_prompt() -> None:
+    """`window.prompt()` is browser chrome, not Home Assistant.
+
+    It ignores the theme, cannot be styled, and on a phone it is a jarring
+    system modal for typing one number. The custom amount is entered inline on
+    the card instead.
+    """
+    source = (WWW / "personal-hydration-card.js").read_text(encoding="utf-8")
+    for banned in ("window.prompt(", "window.alert(", "window.confirm("):
+        assert banned not in source, f"the card still calls {banned}"
+
+
 def test_the_card_registers_its_elements() -> None:
     """A card that defines no custom element silently does nothing."""
     source = (WWW / "personal-hydration-card.js").read_text(encoding="utf-8")

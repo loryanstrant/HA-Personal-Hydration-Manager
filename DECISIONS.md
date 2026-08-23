@@ -3,6 +3,33 @@
 Non-obvious choices and the reasoning behind them, newest first. Anything a future
 reader would otherwise have to re-derive — or worse, quietly undo.
 
+## 2026-08-23 — The custom amount is typed on the card, not in a browser prompt
+
+`+ Custom…` called `window.prompt()` — browser chrome that ignores the theme, cannot be styled,
+and on a phone throws a system modal over everything to collect one number. It also could not
+report a problem: a `parseFloat` failure and a non-positive number were both silently `return`ed,
+so a mistyped amount looked exactly like a successful one.
+
+The replacement is an inline field with **Add** and **Cancel**, styled as the card's own pills
+rather than HA Material fields — the neighbours here are the quick-add pills, and the rule is to
+match *your* neighbours.
+
+**The hard part was survival, not layout.** `_render()` replaces the whole shadow subtree, HA
+assigns `hass` several times a second, and a 30-second tick timer renders too. An input in that
+subtree is destroyed by any of them, mid-typing. So `_render()` now returns early while the field
+is open and replays the pending render on close. The figures freeze for the few seconds it is
+open, which is a better trade than the field vanishing under the user's hands.
+
+**A real bug the preview caught.** Focus has to be deferred by one frame. The button that opens
+the field is removed by the same render, and the browser resets focus to `<body>` as that click
+finishes — undoing a synchronous `focus()`. The first build looked fine in a screenshot and would
+have shipped a field you had to tap twice. It only surfaced because the harness asserted
+`shadowRoot.activeElement`, and the diagnostic that identified it was that a *second* `focus()`
+call stuck when the first had not.
+
+**Lesson:** "it appeared on screen" is not "it works". Assert the states you cannot see in a
+screenshot — focus, what survives a re-render, what was *not* called.
+
 ## 2026-08-23 — The card editor is built on `ha-form`
 
 The editor was 110 lines of hand-built DOM producing seven browser-default controls inside a
