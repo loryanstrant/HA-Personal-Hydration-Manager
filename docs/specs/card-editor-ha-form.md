@@ -11,12 +11,16 @@ own card-configuration dialog, surrounded by HA Material fields, and looks like 
 different font metrics, different focus rings, different spacing, and it follows the browser's
 `color-scheme` rather than the active Home Assistant theme.
 
-Two `standards/ux.md` rules are broken by it:
+The `standards/ux.md` rule it breaks is **consistency** — *"reuse the app's existing primitives
+before inventing new ones; a new control matches the treatment of its neighbours."*
 
-- **Consistency** — *"reuse the app's existing primitives before inventing new ones; a new
-  control matches the treatment of its neighbours."*
-- **Copy** — *"no raw identifiers where a name would do."* The profile `<select>` is populated
-  from entity IDs, in the one field a non-developer has to get right.
+*A correction to the premise this work started from.* The sibling port was driven partly by a
+**copy** violation — Laundry Weather's sensor `<select>` listed raw entity IDs. That does **not**
+apply here: this card's `_profileOptions()` already labelled each option with
+`friendly_name.replace(" Daily target", "")`, so the dropdown already read "Testy McProfile".
+The only raw identifier it could show was the `|| slug` fallback when an entity has no friendly
+name. Worth stating plainly, because the copy argument is the weaker one for this card and the
+two below are the real reasons.
 
 There is also a structural fault, and it matters more than the cosmetic one. `set hass` calls
 `_render()`, which assigns `shadowRoot.innerHTML` unconditionally. Home Assistant assigns `hass`
@@ -50,17 +54,28 @@ that stops the inner event and re-emits `config-changed`.
 
 **The stored `profile` is a slug, not an entity ID.** This is the one place this card differs
 materially from Laundry Weather. The config holds `profile: "loryan"`, from which the card
-string-builds five entity IDs (`sensor.phm_loryan_daily_target` and friends). An entity picker
-therefore needs a mapping in both directions — the same shape as Laundry Weather's tri-state
-Klingon setting — so that the stored shape does not change and no dashboard needs migrating.
+string-builds five entity IDs (`sensor.phm_loryan_daily_target` and friends). The dropdown's
+option values are those slugs directly, so the stored shape is untouched and no dashboard needs
+migrating.
 
-Deriving the slug from `entity_id` is exactly as robust as the card already is: `sensor.py:85`
-pins `entity_id` to `sensor.phm_{slug}_{key}` and the card's whole read path depends on that
-convention. This adds no new fragility.
+Reading the profile list back out of `entity_id` is exactly as robust as the card already is:
+`sensor.py:85` pins `entity_id` to `sensor.phm_{slug}_{key}` and the card's whole read path
+depends on that convention. This adds no new fragility. Labels come from `friendly_name` with
+the trailing " Daily target" stripped, falling back to the entity ID if it has been renamed.
 
-**`include_entities` exists on the entity selector**, so the picker can offer exactly the
-candidate set the old `<select>` produced — the `sensor.phm_*_daily_target` entities — while
-gaining friendly names, icons and search.
+**An entity picker was the original intent, and the preview ruled it out.** `include_entities`
+would have offered exactly the old candidate set with search and icons, so it was built and
+rendered first. Home Assistant's entity picker leads with the *entity's* own name and puts the
+device underneath, so every row read **"Daily target"** with the person's name in smaller text
+below — the opposite emphasis from the one that matters, in the field the whole change is about.
+Both options were rendered in real Home Assistant and compared before choosing.
+
+A named dropdown wins here because the thing being chosen is a person from the household, not an
+arbitrary entity. It is not a return to the fault being fixed: the objection to the old
+`<select>` was that it listed *raw identifiers*, and a list of people's names is not that. It
+also removes a whole class of bug — the option values *are* the stored slugs, so nothing is
+translated on the way in or out. The cost is the loss of a search box, which starts to matter
+somewhere past about eight profiles.
 
 **`ha-form` is only defined once Home Assistant has loaded its editor chunk.** Mushroom's
 `loadHaComponents()` — calling `hui-tile-card.getConfigElement()` to force it — is the
@@ -93,23 +108,23 @@ handling.
 
 | field | selector | note |
 |---|---|---|
-| `profile` | `entity` with `include_entities` | friendly name + search |
+| `profile` | `select`, dropdown | options are `{value: slug, label: person's name}` |
 | `title` | `text` | new — the card has a title row with no override |
 | `show_title`, `show_cup`, `show_countdown`, `show_manual` | four `boolean` in one `grid` | today's 2×2 block |
 | `unit` | `select`, dropdown | Metric (mL / L) · Imperial (fl oz) |
-| `quick_add` | `select`, `multiple` + `custom_value` | chips; presets 150·200·250·330·500·750·1000, any number typeable |
+| `quick_add` | `select`, `multiple` + `custom_value` | chips; presets 150·200·250·300·330·500·750·1000, bare numbers, any value typeable |
 
 ### States
 
-- **Empty** — with no profiles configured, `include_entities` is empty and HA shows a bare "no
-  matching entities". The profile helper is replaced in that case with *"No hydration profiles
-  yet — add one under Settings → Devices & Services → Personal Hydration Manager."*
+- **Empty** — with no profiles configured the dropdown has no options and says nothing useful
+  about why. The profile helper is replaced in that case with *"No hydration profiles yet — add
+  one under Settings → Devices & Services → Personal Hydration Manager."*
 - **Loading** — `_render()` returns until `hass` arrives. In the real dialog `hass` is present on
   the first assignment.
-- **Error / stale profile** — if the stored slug resolves to no entity (integration removed,
-  entity renamed), the picker maps it to `""`. Editing *any other field* would then emit
-  `profile: ""` and silently clear it. The editor records whether the slug resolved; if it did
-  not and the incoming picker value is also empty, the stored slug is kept.
+- **Error / stale profile** — a stored slug matching no option leaves the dropdown blank, and
+  editing *any other field* would read that blank as the user clearing the profile. The editor
+  restores the stored slug, but **only when it is genuinely absent from the list** — clearing a
+  profile that *is* in the list is honoured, so the field stays clearable.
 - **380px** — verified by screenshot, not assumed.
 - **Status** — no colour-only state anywhere in the editor.
 - **Mobile parity** — no separate work. Home Assistant cards render in the companion app through
@@ -119,8 +134,8 @@ handling.
 
 1. Every control is a Home Assistant component; **no raw `<select>` or `<input>` survives** in the
    editor.
-2. The profile picker offers exactly the entities the old `_profileOptions()` filter produced —
-   the `sensor.phm_*_daily_target` sensors — shown by friendly name, and searchable.
+2. The profile control offers exactly the profiles the old `_profileOptions()` filter produced —
+   one per `sensor.phm_*_daily_target` sensor — labelled with the person's name and nothing else.
 3. Every stored config key round-trips unchanged. `profile` remains a slug; a config written by
    the old editor loads and re-saves byte-identically, and no dashboard needs an edit.
 4. Editing a field other than the profile never clears a profile whose entity is missing.
@@ -128,7 +143,7 @@ handling.
    says so explicitly.
 6. The `ha-form` element is the **same node object across 20 consecutive `hass` assignments**, and
    the editor still updates when the config genuinely changes.
-7. The entity picker renders with non-zero height.
+7. The profile control renders with non-zero height.
 8. Screenshots at desktop and ~380px show the editor matching the surrounding HA fields.
 
 ## Non-goals
@@ -138,3 +153,18 @@ handling.
 - Migrating stored configs. Nothing about the stored shape changes, so there is nothing to
   migrate.
 - The `window.prompt()` behind `+ Custom…` — handled separately.
+
+## What shipped
+
+![The editor at desktop width](../images/card-editor.png)
+
+![The editor at 380px](../images/card-editor-380.png)
+
+Verified by `scripts/verify-card-editor.mjs`, which drives a real Home Assistant in Chromium and
+asserts all of the above — 11/11. Run it against `HomeAssistant-DEV` with:
+
+```
+ssh blaster "sudo -n docker run --rm --network container:HomeAssistant-DEV \
+  -v /tmp/phm-verify:/work -v /tmp/phm-verify/out:/out -w /work -e HA_TOKEN=... \
+  mcr.microsoft.com/playwright:v1.48.0-jammy bash -lc 'node verify-card-editor.mjs'"
+```
