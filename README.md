@@ -139,6 +139,12 @@ The HidrateSpark proxy can be wired in either as the `source_sensor` (recommende
 
 After installation, open any dashboard, click **+ Add Card**, search for **Personal Hydration** — you'll see a live preview.
 
+The percentage is drawn **inside the cup**, on the waterline, rather than in a row above it. It
+changes colour as the water rises past it, so it stays readable at every fill level in both light
+and dark themes. If you turn the cup off, the percentage moves back up to the card's header.
+
+![The card at 45%](docs/images/percent-in-cup.png)
+
 The visual editor exposes:
 
 - Profile (which config entry)
