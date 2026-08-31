@@ -141,3 +141,51 @@ they cost nothing per run and each one encodes a fault that actually shipped.
 **Lesson:** the cheapest tests in a HACS repo are the ones that never start Home
 Assistant. A packaging suite is worth writing on the day you need the first guard,
 because it arrives carrying the rest.
+
+## 2026-08-31 — The percentage moved into the cup, and needed two of itself to do it
+
+The progress percentage lived in a header row. Moving it into the cup saves that row and puts the
+number on the gauge it describes — but it introduces a problem the header version never had: **the
+number's backdrop moves.** Above the waterline it sits on the card background, which is near-white
+in a light theme and near-black in a dark one. Below it, on the water gradient. And the waterline
+travels through the digits during the day.
+
+No single fill colour survives that. The measurements, taken from the live DOM rather than guessed:
+
+- Theme text colour is invisible on the water in a light theme.
+- Bare white is **1.81:1** against the pale `#7ec8ff` at the water's surface — and mid-fill is
+  exactly where the number sits. It is also invisible on a white card.
+- Deep navy reads well on water but is **~1.5:1** on a dark card, so it cannot serve as the dry
+  colour either.
+
+So the number is drawn **twice**, at identical coordinates, each copy clipped to one side of the
+waterline. `dry` takes `var(--primary-text-color)` and is correct in both themes for free; `wet` is
+theme-independent because its backdrop is the water, which is the same blue in every theme. The
+split lands exactly on the waterline, so a digit can be half one colour and half the other — which
+is the effect a liquid gauge is expected to have, not an artefact.
+
+The wet copy is white with a translucent dark halo, and **the halo is load-bearing**. Composited
+over the water it gives the glyph a 3.94:1 boundary at the surface and 5.77:1 at the base. Delete
+the halo and the number fails at exactly one fill range, which is the kind of regression that ships.
+`scripts/verify-percent-in-cup.mjs` measures the halo specifically, not just "the text is white".
+
+Two things only the pictures could settle, both from `scripts/mock-percent-in-cup.mjs` — which
+renders the **real card file** with only `_renderCup()` patched, so it cannot flatter a design the
+card would not actually produce:
+
+- **The two-tone state is rare.** The digits span y≈101–129 and the waterline is at
+  `180 − pct × 1.6`, so it only crosses them between ~32% and ~50%. The colour-split case that
+  drove the whole design is a narrow band, not the normal state.
+- **Neither candidate is smooth in both themes.** White+halo is seamless in dark (both halves
+  near-white) and flips in light; navy is the reverse. There is no treatment that avoids a flip,
+  because the dry copy must follow the theme and the wet copy must not.
+
+**Lesson:** when a design question is "which of these looks right", render the real component and
+look at it. Both candidates cleared the contrast thresholds on paper; the thing that actually
+decided it — that the split is invisible in dark mode for one of them and not the other — is not
+visible in a contrast ratio.
+
+**Also:** the version bump has **three** sites, not two. `tests/test_packaging.py` caught
+`frontend.py`'s cache-buster still at 0.2.0 after `manifest.json` and `CARD_VERSION` were both
+moved to 0.3.0. That cache-buster is what busts a stale card bundle in the browser, so shipping it
+wrong would have left users on the old card with no clue why.

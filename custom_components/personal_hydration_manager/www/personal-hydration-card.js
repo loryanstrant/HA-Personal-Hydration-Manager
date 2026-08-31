@@ -10,7 +10,7 @@
 
 const CARD_TAG = "personal-hydration-card";
 const EDITOR_TAG = "personal-hydration-card-editor";
-const CARD_VERSION = "0.2.0";
+const CARD_VERSION = "0.3.0";
 
 const ML_PER_FL_OZ = 29.5735;
 
@@ -175,6 +175,13 @@ class PersonalHydrationCard extends HTMLElement {
     const name = target.attributes?.friendly_name?.split(" ")[0] || profile;
 
     const showTitle = this._config.show_title !== false;
+
+    // The percentage is drawn inside the cup. With the cup switched off there
+    // is nowhere to put it, so it falls back to the header exactly as it used
+    // to render — turning the cup off must not silently cost you the number.
+    const showCup = !!this._config.show_cup;
+    const pctText = `${progressPct.toFixed(0)}%`;
+
     this.shadowRoot.innerHTML = `
       ${this._styles()}
       <ha-card>
@@ -182,13 +189,13 @@ class PersonalHydrationCard extends HTMLElement {
           ${showTitle ? `
             <header class="hyd-header">
               <div class="hyd-name">${name}</div>
-              <div class="hyd-percent">${progressPct.toFixed(0)}%</div>
+              ${showCup ? "" : `<div class="hyd-percent">${pctText}</div>`}
             </header>
-          ` : `
-            <div class="hyd-percent-only">${progressPct.toFixed(0)}%</div>
+          ` : showCup ? "" : `
+            <div class="hyd-percent-only">${pctText}</div>
           `}
 
-          ${this._config.show_cup ? this._renderCup(progressPct, unit, consumedMl, targetMl) : ""}
+          ${showCup ? this._renderCup(progressPct, unit, consumedMl, targetMl) : ""}
           ${this._config.show_countdown ? this._renderCountdown(remainingMl, paceMl, unit) : ""}
           ${this._config.show_manual ? this._renderManual(unit) : ""}
         </div>
@@ -207,12 +214,36 @@ class PersonalHydrationCard extends HTMLElement {
 
   _renderCup(progressPct, unit, consumedMl, targetMl) {
     const fillY = 180 - (progressPct / 100) * 160;
+    const pct = progressPct.toFixed(0);
+    // The percentage used to be a header row. It now lives in the cup, which
+    // means its backdrop moves: card background above the waterline, water
+    // below it, and the waterline travels through the digits during the day.
+    // No single fill colour survives that, so the number is drawn twice and
+    // each copy is clipped to one side of the line. The split lands exactly on
+    // the waterline, so a digit can be half one colour and half the other.
+    //
+    // The dry copy takes the theme's text colour and so is correct in light and
+    // dark for free. The wet copy is theme-independent because its backdrop is
+    // the water, which is the same blue in every theme.
+    const number = `${pct}<tspan class="hyd-pct-sign">%</tspan>`;
+    // The SVG can no longer be aria-hidden: it now carries the only copy of a
+    // figure that used to be real text.
+    const label =
+      `${pct}% of today's target — ` +
+      `${mlToDisplay(consumedMl, unit)} ${unitLabel(unit, consumedMl)} of ` +
+      `${mlToDisplay(targetMl, unit)} ${unitLabel(unit, targetMl)}`;
     return `
       <div class="hyd-cup-wrap">
-        <svg viewBox="0 0 200 220" class="hyd-cup" aria-hidden="true">
+        <svg viewBox="0 0 200 220" class="hyd-cup" role="img" aria-label="${label}">
           <defs>
             <clipPath id="cupClip">
               <path d="M40,20 L160,20 L150,200 Q150,210 140,210 L60,210 Q50,210 50,200 Z" />
+            </clipPath>
+            <clipPath id="dryClip">
+              <rect x="0" y="0" width="200" height="${fillY}" />
+            </clipPath>
+            <clipPath id="wetClip">
+              <rect x="0" y="${fillY}" width="200" height="${220 - fillY}" />
             </clipPath>
             <linearGradient id="waterGrad" x1="0" x2="0" y1="0" y2="1">
               <stop offset="0%" stop-color="#7ec8ff" />
@@ -234,6 +265,8 @@ class PersonalHydrationCard extends HTMLElement {
                 dur="3s" repeatCount="indefinite" />
             </path>
           </g>
+          <text x="100" y="129" class="hyd-pct hyd-pct-dry" clip-path="url(#dryClip)">${number}</text>
+          <text x="100" y="129" class="hyd-pct hyd-pct-wet" clip-path="url(#wetClip)">${number}</text>
         </svg>
         <div class="hyd-cup-caption">
           ${mlToDisplay(consumedMl, unit)} <span class="u">${unitLabel(unit, consumedMl)}</span>
@@ -407,6 +440,27 @@ class PersonalHydrationCard extends HTMLElement {
         }
         .hyd-cup-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .hyd-cup { width: 160px; height: 180px; }
+
+        /* The percentage inside the cup. Sizes are in viewBox units, so they
+           hold at every rendered width. The cup walls are only ~106 units
+           apart at this height and "100%" is the widest string the card can
+           draw, which is what sets the size and the smaller sign. */
+        .hyd-pct {
+          font-size: 40px; font-weight: 700;
+          text-anchor: middle; letter-spacing: -1px;
+        }
+        .hyd-pct-sign { font-size: 22px; }
+        .hyd-pct-dry { fill: var(--primary-text-color, #212121); }
+        /* White alone measures ~1.8:1 against the pale #7ec8ff at the water's
+           surface — which is exactly where the number sits at mid-fill. The
+           halo is what makes it readable there, not decoration. */
+        .hyd-pct-wet {
+          fill: #ffffff;
+          paint-order: stroke;
+          stroke: rgba(0, 42, 71, 0.42);
+          stroke-width: 3px;
+          stroke-linejoin: round;
+        }
         .hyd-cup-caption { font-size: 0.95rem; }
         .hyd-cup-caption .u { font-size: 0.8rem; opacity: 0.7; }
         .hyd-cup-caption .muted { color: var(--secondary-text-color, #888); }
