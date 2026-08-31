@@ -10,7 +10,7 @@
 
 const CARD_TAG = "personal-hydration-card";
 const EDITOR_TAG = "personal-hydration-card-editor";
-const CARD_VERSION = "0.3.0";
+const CARD_VERSION = "0.3.1";
 
 const ML_PER_FL_OZ = 29.5735;
 
@@ -213,8 +213,31 @@ class PersonalHydrationCard extends HTMLElement {
   }
 
   _renderCup(progressPct, unit, consumedMl, targetMl) {
-    const fillY = 180 - (progressPct / 100) * 160;
     const pct = progressPct.toFixed(0);
+
+    // The cup's interior runs from the rim at y=20 to its floor at y=210. The
+    // fill used to start at y=180 — thirty units up from the floor — so an
+    // untouched target still drew a band of water across the bottom and the
+    // card looked like you had drunk something while reading "0%".
+    //
+    // The rule now is that the picture agrees with the number the card prints:
+    // "0%" draws no water at all, and anything that prints 1% or more always
+    // shows at least a visible sliver. Both sides of that key off the ROUNDED
+    // percentage rather than the raw value, which is the part that makes it
+    // hold — 0.4% prints "0%" and must show nothing, 0.6% prints "1%" and must
+    // show something.
+    const CUP_FLOOR = 210;
+    const CUP_RIM = 20;
+    const MIN_DEPTH = 4; // ~3px on screen: the smallest sliver that reads as water
+    const hasWater = Number(pct) > 0;
+    const depth = hasWater
+      ? Math.max(MIN_DEPTH, (progressPct / 100) * (CUP_FLOOR - CUP_RIM))
+      : 0;
+    const fillY = CUP_FLOOR - depth;
+    // The wave swings +/-6 units around the surface. On a 4-unit puddle that
+    // ripple would be deeper than the water, so it scales down with the fill
+    // and only reaches its full amplitude on a reasonably full cup.
+    const wave = Math.min(6, depth / 2);
     // The percentage used to be a header row. It now lives in the cup, which
     // means its backdrop moves: card background above the waterline, water
     // below it, and the waterline travels through the digits during the day.
@@ -252,19 +275,20 @@ class PersonalHydrationCard extends HTMLElement {
           </defs>
           <path d="M40,20 L160,20 L150,200 Q150,210 140,210 L60,210 Q50,210 50,200 Z"
                 fill="none" stroke="var(--primary-text-color, #333)" stroke-width="3" />
-          <g clip-path="url(#cupClip)">
+          ${hasWater ? `
+          <g clip-path="url(#cupClip)" class="hyd-water">
             <rect x="0" y="${fillY}" width="200" height="220" fill="url(#waterGrad)">
               <animate attributeName="y" from="${fillY + 4}" to="${fillY}" dur="1.2s" fill="freeze" />
             </rect>
-            <path d="M0,${fillY} Q25,${fillY - 6} 50,${fillY} T100,${fillY} T150,${fillY} T200,${fillY} V220 H0 Z"
+            <path d="M0,${fillY} Q25,${fillY - wave} 50,${fillY} T100,${fillY} T150,${fillY} T200,${fillY} V220 H0 Z"
                   fill="url(#waterGrad)" opacity="0.7">
               <animate attributeName="d"
-                values="M0,${fillY} Q25,${fillY - 6} 50,${fillY} T100,${fillY} T150,${fillY} T200,${fillY} V220 H0 Z;
-                        M0,${fillY} Q25,${fillY + 6} 50,${fillY} T100,${fillY} T150,${fillY} T200,${fillY} V220 H0 Z;
-                        M0,${fillY} Q25,${fillY - 6} 50,${fillY} T100,${fillY} T150,${fillY} T200,${fillY} V220 H0 Z"
+                values="M0,${fillY} Q25,${fillY - wave} 50,${fillY} T100,${fillY} T150,${fillY} T200,${fillY} V220 H0 Z;
+                        M0,${fillY} Q25,${fillY + wave} 50,${fillY} T100,${fillY} T150,${fillY} T200,${fillY} V220 H0 Z;
+                        M0,${fillY} Q25,${fillY - wave} 50,${fillY} T100,${fillY} T150,${fillY} T200,${fillY} V220 H0 Z"
                 dur="3s" repeatCount="indefinite" />
             </path>
-          </g>
+          </g>` : ""}
           <text x="100" y="129" class="hyd-pct hyd-pct-dry" clip-path="url(#dryClip)">${number}</text>
           <text x="100" y="129" class="hyd-pct hyd-pct-wet" clip-path="url(#wetClip)">${number}</text>
         </svg>

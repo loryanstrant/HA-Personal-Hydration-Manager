@@ -135,10 +135,15 @@ measurements it reports rather than assumes:
 | Halo at the water's surface | **3.94:1** (bare white would be 1.81:1) |
 | Halo at the cup's base | **5.77:1** (bare white would be 3.12:1) |
 
-The design choice itself was made from `scripts/mock-percent-in-cup.mjs`, which renders the real
+The design choice itself was made from `scripts/mock-percent-in-cup.mjs`, which rendered the real
 card file with only `_renderCup()` patched, across both candidate treatments × five fill levels ×
-both themes.
+both themes. (That script no longer patches anything — see the note below.)
 
 One thing the mockups settled that the maths had not: **the two-tone state is rare.** The digits
-span y≈101–129 and the waterline is at `180 − pct × 1.6`, so it only crosses them between about
-**32% and 50%**. Everywhere else the number is a single colour.
+span y≈101–129, so the waterline only crosses them over a narrow band of fill levels. Everywhere
+else the number is a single colour.
+
+> **Updated in 0.3.1.** The waterline was `180 − pct × 1.6`, which put the two-tone band at ~32–50%
+> — but it also meant 0% drew water thirty units above the cup's floor, so an untouched target
+> looked one-sixth full. The fill now runs from the floor: `210 − pct × 1.9`, and **the band moved
+> to ~43–58%**. See [empty-cup-looks-empty.md](empty-cup-looks-empty.md).
