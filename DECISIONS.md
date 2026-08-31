@@ -176,6 +176,8 @@ card would not actually produce:
 - **The two-tone state is rare.** The digits span y≈101–129 and the waterline is at
   `180 − pct × 1.6`, so it only crosses them between ~32% and ~50%. The colour-split case that
   drove the whole design is a narrow band, not the normal state.
+  *(Superseded in 0.3.1: that waterline formula was wrong at the bottom of the range and became
+  `210 − pct × 1.9`, moving the band to ~43–58%. See the 2026-09-01 entry.)*
 - **Neither candidate is smooth in both themes.** White+halo is seamless in dark (both halves
   near-white) and flips in light; navy is the reverse. There is no treatment that avoids a flip,
   because the dry copy must follow the theme and the wet copy must not.
@@ -189,3 +191,44 @@ visible in a contrast ratio.
 `frontend.py`'s cache-buster still at 0.2.0 after `manifest.json` and `CARD_VERSION` were both
 moved to 0.3.0. That cache-buster is what busts a stale card bundle in the browser, so shipping it
 wrong would have left users on the old card with no clue why.
+
+## 2026-09-01 — An empty cup was drawing water, and five places recorded the wrong formula
+
+The cup's interior runs from the rim at y=20 to its floor at **y=210**. The fill mapped 0% to
+**y=180** — thirty units above the floor — so an untouched daily target still drew a band of water
+across the bottom, about a sixth of the cup's height. The card said "0%" while the picture said
+you had had a drink.
+
+This was original code, not a regression from moving the percentage into the cup. But it survived
+0.3.0 because the design mockups rendered 0% with that band and nobody, including the person who
+made them, looked at the empty case and asked whether it was right. **A test suite that sweeps
+20 / 35 / 45 / 70 / 100% never asks what nothing looks like.**
+
+The fix is `210 − pct × 1.9`, plus a rule worth more than the arithmetic: **the picture agrees
+with the number the card prints.**
+
+- prints `0%` → no water element is emitted at all
+- prints `1%` or more → the depth is floored at 4 units so it is always visible
+
+Both sides key off the **rounded** percentage rather than the raw sensor value, and that is the
+part that makes it hold. A profile at 0.4% prints "0%" and must therefore show nothing; one at
+0.6% prints "1%" and must show something. Keying off the raw value would have reintroduced exactly
+the reported fault at a smaller scale.
+
+The wave amplitude now scales with depth (`min(6, depth / 2)`) — a fixed ±6 ripple on a 4-unit
+puddle is deeper than the water it is rippling.
+
+**The expensive part was not the fix.** The waterline formula, or the ~32–50% two-tone band it
+implies, was written down in **five** places: the card, the verify script's assertion, the mock
+harness's comment *and* its patched copy of `_renderCup`, the spec, and the previous DECISIONS
+entry. Changing the card without the other four would have left four confident, wrong statements
+for the next person to trust.
+
+Two lessons, and the second is the one worth keeping:
+
+- **Test the empty state.** It is the state every user sees first, on the day they install.
+- **A duplicated implementation in a test harness is a liability the moment the design ships.**
+  `mock-percent-in-cup.mjs` carried its own `_renderCup` so it could show two candidate colour
+  treatments side by side. That was right while the design was a proposal and wrong the instant it
+  landed: the copy would have gone on rendering the old geometry, flattering a card that no longer
+  existed. It now renders the real card with nothing patched.

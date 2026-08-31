@@ -117,6 +117,23 @@ const bootstrap = async () => {
   return page.evaluate(BUILD, PROFILE);
 };
 
+/* The Home Assistant frontend occasionally reloads mid-run and destroys the
+ * execution context, taking the harness and the injected helpers with it. That
+ * is a frontend hiccup, not a failing assertion, so retry once from a clean
+ * page rather than reporting it as one. Same trap the card-editor harness hit;
+ * see DECISIONS.md. */
+const resilient = async (fn) => {
+  try {
+    return await fn();
+  } catch (err) {
+    if (!String(err).includes("Execution context was destroyed")) throw err;
+    console.log("  (frontend navigated mid-run — rebuilding and retrying once)");
+    await bootstrap();
+    await injectHelpers();
+    return await fn();
+  }
+};
+
 const built = await bootstrap();
 console.log("build:", JSON.stringify(built), "\n");
 if (!built.built) {
@@ -198,7 +215,7 @@ await injectHelpers();
 
 /* ---------- 1. The number left the header and is in the cup ---------- */
 
-const placement = await page.evaluate(async () => {
+const placement = await resilient(() => page.evaluate(async () => {
   const { card, state } = window.__phm;
   await state.setPct(45, { show_cup: true, show_title: true });
   const r = card.shadowRoot;
@@ -214,7 +231,7 @@ const placement = await page.evaluate(async () => {
   out.noTitleHeader = Boolean(r.querySelector(".hyd-header"));
   out.noTitleStandalone = Boolean(r.querySelector(".hyd-percent-only"));
   return out;
-});
+}));
 
 check("the header no longer carries a percentage", !placement.headerPercent);
 check("no standalone percentage row", !placement.standalonePercent);
@@ -227,20 +244,32 @@ check(
 
 /* ---------- 2. The split lands on the waterline, at every level ---------- */
 
-const geometry = await page.evaluate(async () => {
+const geometry = await resilient(() => page.evaluate(async () => {
   const { card, state } = window.__phm;
   const r = card.shadowRoot;
   const rows = [];
-  for (const pct of [0, 20, 32, 35, 45, 50, 70, 100]) {
+  // The low end carries the interesting cases now: 0 and 0.4 must draw NO
+  // water (both print "0%"), 0.6 through 2 must all show the floored sliver.
+  // The empty case had no coverage before, which is exactly why a cup that
+  // looked one-sixth full at 0% shipped in 0.3.0.
+  for (const pct of [0, 0.4, 0.6, 1, 2, 20, 43, 45, 50, 57, 70, 100]) {
     await state.setPct(pct, { show_cup: true, show_title: true });
-    const expected = 180 - (pct / 100) * 160;
+    // The cup's floor is y=210 and its rim y=20; a sliver is floored at 4
+    // units so anything printing 1% or more stays visible.
+    const shown = pct.toFixed(0);
+    const hasWater = Number(shown) > 0;
+    const depth = hasWater ? Math.max(4, (pct / 100) * 190) : 0;
+    const expected = 210 - depth;
     const dry = r.querySelector("#dryClip rect");
     const wet = r.querySelector("#wetClip rect");
     const text = r.querySelector(".hyd-pct-dry");
     const bbox = text.getBBox();
     rows.push({
       pct,
+      shown,
       expected,
+      hasWater,
+      waterDrawn: Boolean(r.querySelector(".hyd-water")),
       dryBottom: dry ? parseFloat(dry.getAttribute("y")) + parseFloat(dry.getAttribute("height")) : null,
       wetTop: wet ? parseFloat(wet.getAttribute("y")) : null,
       coversCup: wet ? parseFloat(wet.getAttribute("y")) + parseFloat(wet.getAttribute("height")) >= 220 : false,
@@ -249,7 +278,7 @@ const geometry = await page.evaluate(async () => {
     });
   }
   return rows;
-});
+}));
 
 const splitOk = geometry.every(
   (g) => Math.abs(g.dryBottom - g.expected) < 0.01 && Math.abs(g.wetTop - g.expected) < 0.01 && g.coversCup
@@ -258,6 +287,28 @@ check(
   "both clips split exactly on the waterline at every fill level",
   splitOk,
   geometry.map((g) => `${g.pct}%→y${g.expected.toFixed(0)}`).join(" ")
+);
+
+/* The fault this release fixes: an empty cup that looked one-sixth full. The
+ * rule is that the picture agrees with the number the card prints, so the
+ * check is against the ROUNDED percentage, not the raw value. */
+const emptyOk = geometry.every((g) => g.waterDrawn === g.hasWater);
+check(
+  "water is drawn exactly when the number says so",
+  emptyOk,
+  geometry.map((g) => `${g.pct}→"${g.shown}%"${g.waterDrawn ? " wet" : " dry"}`).join(" ")
+);
+const zero = geometry.find((g) => g.pct === 0);
+check(
+  "at 0% the cup is completely empty",
+  zero && !zero.waterDrawn && Math.abs(zero.expected - 210) < 0.01,
+  `waterline at the cup floor y=${zero?.expected}, no water element`
+);
+const sliver = geometry.filter((g) => [0.6, 1, 2].includes(g.pct));
+check(
+  "anything printing 1% or more shows a visible sliver",
+  sliver.length === 3 && sliver.every((g) => g.waterDrawn && 210 - g.expected >= 4),
+  sliver.map((g) => `${g.pct}%→${(210 - g.expected).toFixed(1)}u deep`).join(" ")
 );
 
 // The cup walls taper: left edge runs (40,20)→(50,200), right edge mirrors it.
@@ -277,7 +328,7 @@ check(
 
 /* ---------- 3. Accessibility ---------- */
 
-const a11y = await page.evaluate(async () => {
+const a11y = await resilient(() => page.evaluate(async () => {
   const { card, state } = window.__phm;
   await state.setPct(45, { show_cup: true, show_title: true });
   const svg = card.shadowRoot.querySelector("svg.hyd-cup");
@@ -286,7 +337,7 @@ const a11y = await page.evaluate(async () => {
     label: svg.getAttribute("aria-label"),
     hidden: svg.getAttribute("aria-hidden"),
   };
-});
+}));
 check("the cup is exposed as an image, not hidden", a11y.role === "img" && a11y.hidden === null);
 check(
   "its label states the percentage in words",
@@ -296,7 +347,7 @@ check(
 
 /* ---------- 4. Contrast, measured from computed styles ---------- */
 
-const contrast = await page.evaluate(async () => {
+const contrast = await resilient(() => page.evaluate(async () => {
   const { card, host, state } = window.__phm;
   const r = card.shadowRoot;
   await state.setPct(45, { show_cup: true, show_title: true });
@@ -340,7 +391,7 @@ const contrast = await page.evaluate(async () => {
   await new Promise((res) => setTimeout(res, 250));
 
   return { light, dark };
-});
+}));
 
 for (const [theme, m] of Object.entries(contrast)) {
   check(
@@ -359,7 +410,7 @@ check(
 
 /* ---------- 5. Cup off returns the number to the header ---------- */
 
-const cupOff = await page.evaluate(async () => {
+const cupOff = await resilient(() => page.evaluate(async () => {
   const { card, state } = window.__phm;
   const r = card.shadowRoot;
   await state.setPct(45, { show_cup: false, show_title: true });
@@ -373,7 +424,7 @@ const cupOff = await page.evaluate(async () => {
     cup: Boolean(r.querySelector("svg.hyd-cup")),
   };
   return { withTitle, noTitle };
-});
+}));
 check(
   "cup off, name on — the percentage is back in the header",
   cupOff.withTitle.header === "45%" && !cupOff.withTitle.cup,

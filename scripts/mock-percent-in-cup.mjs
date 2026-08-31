@@ -1,19 +1,20 @@
 /**
- * Design mockups for "the percentage is displayed inside the cup".
+ * Renders the card across its whole fill range, for looking at.
  *
- * Renders the REAL card file in a browser — same markup, same styles, same
- * theme variables — and patches only `_renderCup()` with the proposed version.
- * Nothing here is a lookalike, so what the screenshots show is what the card
- * will do.
+ * Loads the REAL card file in a browser — same markup, same styles, same theme
+ * variables — with nothing patched. No Home Assistant needed: the card only
+ * wants a `hass` object with five sensor states on it, so this runs in seconds
+ * and shows every fill level side by side in both themes.
  *
- * No Home Assistant needed: the card only wants a `hass` object with five
- * sensor states on it. Runs in seconds, which is the point — this is the step
- * that happens BEFORE any product code, to choose the colour treatment from a
- * picture rather than from contrast arithmetic.
+ * It began as a design harness that patched `_renderCup()` with two candidate
+ * colour treatments for the percentage-inside-the-cup work. That choice is
+ * settled and shipped, so the patching is gone: a mock carrying its own copy
+ * of a method the card already has is a trap that goes stale silently and then
+ * flatters a design the card no longer produces.
  *
  * Runs inside the Playwright image on BLASTER (Rufus itself has no browser):
  *   docker run --rm -v /tmp/phm-mock:/work -w /work \
- *     mcr.microsoft.com/playwright:v1.48.0-jammy node mock-percent-in-cup.mjs
+ *     mcr.microsoft.com/playwright:v1.48.0-jammy node scripts/mock-percent-in-cup.mjs
  */
 import { chromium } from "playwright-core";
 import { readFileSync, mkdirSync } from "node:fs";
@@ -31,16 +32,20 @@ const CARD_SRC = readFileSync(CARD_PATH, "utf8");
 mkdirSync(OUT, { recursive: true });
 
 /*
- * The fill levels that matter, and why these five.
+ * The fill levels that matter, and why these.
  *
  * The number's cap height spans roughly y=101..129 in the cup's 200x220
- * viewBox, and the waterline is at `180 - pct * 1.6`. So the waterline only
- * crosses the digits between about 32% and 50% — 35 and 45 are the two-tone
- * cases, and everything outside that band is a single colour. 0 and 100 are
- * the extremes; 100 is also the widest string the card can ever draw and the
- * one that decides the font size.
+ * viewBox, and the waterline is at `210 - pct * 1.9`. So the waterline only
+ * crosses the digits between about 43% and 58% — 45 and 55 are the two-tone
+ * cases, and everything outside that band is a single colour.
+ *
+ * 0 and 1 are the pair that matter for 0.3.1: the cup used to fill from y=180
+ * rather than from its floor at y=210, so an untouched target drew a band of
+ * water and the card looked like you had drunk something while reading "0%".
+ * 0 must now be visibly empty and 1 must visibly not be. 100 is the widest
+ * string the card can ever draw and the one that decides the font size.
  */
-const LEVELS = [0, 35, 45, 70, 100];
+const LEVELS = [0, 1, 25, 45, 55, 100];
 const TARGET_ML = 3000;
 
 const THEMES = {
@@ -72,34 +77,11 @@ const THEMES = {
   },
 };
 
-/* The two candidate treatments for the copy of the number that sits on water.
- * `dry` is the same in both — it takes the theme's text colour, so it is
- * correct in light and dark for free. Only the wet copy is in question. */
-const VARIANTS = {
-  W1: {
-    title: "W1 — white with a dark halo",
-    blurb: "White survives the pale blue at the waterline only because of the halo.",
-    css: `.hyd-pct-wet {
-            fill: #ffffff;
-            paint-order: stroke;
-            stroke: rgba(0, 42, 71, .42);
-            stroke-width: 3px;
-            stroke-linejoin: round;
-          }`,
-  },
-  W2: {
-    title: "W2 — deep navy, no halo",
-    blurb: "Navy reads on every shade of the water without an outline.",
-    css: `.hyd-pct-wet { fill: #0a3d5c; }`,
-  },
-};
-
 const PAGE = `<!doctype html>
 <html><head><meta charset="utf-8"><style>
   body { margin: 0; font-family: Roboto, "Helvetica Neue", Arial, sans-serif; }
   .sheet { padding: 24px 28px 32px; }
-  h2 { font-size: 15px; font-weight: 700; margin: 26px 0 2px; letter-spacing: .01em; }
-  h2:first-child { margin-top: 0; }
+  h2 { font-size: 15px; font-weight: 700; margin: 0 0 2px; letter-spacing: .01em; }
   p.blurb { font-size: 12.5px; margin: 0 0 12px; opacity: .72; }
   .row { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
   .cell { width: 292px; }
@@ -111,7 +93,7 @@ const PAGE = `<!doctype html>
 
 const buildSheet = async (page, { themeName, mode }) => {
   await page.evaluate(
-    ({ themeName, mode, THEMES, VARIANTS, LEVELS, TARGET_ML }) => {
+    ({ themeName, mode, THEMES, LEVELS, TARGET_ML }) => {
       const theme = THEMES[themeName];
       document.body.style.background = theme.page;
       document.body.style.color = theme.vars["--primary-text-color"];
@@ -152,63 +134,8 @@ const buildSheet = async (page, { themeName, mode }) => {
         };
       };
 
-      /* The proposed _renderCup: the number drawn twice, each copy clipped to
-       * one side of the waterline. Everything else — the cup path, the
-       * gradient, the wave — is byte-for-byte what ships today. */
-      const proposedRenderCup = function (progressPct, unit, consumedMl, targetMl) {
-        const fillY = 180 - (progressPct / 100) * 160;
-        const pct = progressPct.toFixed(0);
-        const number = `${pct}<tspan class="hyd-pct-sign">%</tspan>`;
-        const CUP = "M40,20 L160,20 L150,200 Q150,210 140,210 L60,210 Q50,210 50,200 Z";
-        return `
-      <div class="hyd-cup-wrap">
-        <svg viewBox="0 0 200 220" class="hyd-cup" role="img"
-             aria-label="${pct}% of today's target">
-          <defs>
-            <clipPath id="cupClip"><path d="${CUP}" /></clipPath>
-            <clipPath id="dryClip"><rect x="0" y="0" width="200" height="${fillY}" /></clipPath>
-            <clipPath id="wetClip"><rect x="0" y="${fillY}" width="200" height="${220 - fillY}" /></clipPath>
-            <linearGradient id="waterGrad" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stop-color="#7ec8ff" />
-              <stop offset="100%" stop-color="#2196f3" />
-            </linearGradient>
-          </defs>
-          <path d="${CUP}" fill="none" stroke="var(--primary-text-color, #333)" stroke-width="3" />
-          <g clip-path="url(#cupClip)">
-            <rect x="0" y="${fillY}" width="200" height="220" fill="url(#waterGrad)" />
-            <path d="M0,${fillY} Q25,${fillY - 6} 50,${fillY} T100,${fillY} T150,${fillY} T200,${fillY} V220 H0 Z"
-                  fill="url(#waterGrad)" opacity="0.7" />
-          </g>
-          <text x="100" y="129" class="hyd-pct hyd-pct-dry" clip-path="url(#dryClip)">${number}</text>
-          <text x="100" y="129" class="hyd-pct hyd-pct-wet" clip-path="url(#wetClip)">${number}</text>
-        </svg>
-        <div class="hyd-cup-caption">
-          ${consumedMl >= 1000 ? (consumedMl / 1000).toFixed(2) : Math.round(consumedMl)}
-          <span class="u">${consumedMl >= 1000 ? "L" : "mL"}</span>
-          <span class="muted"> / ${(targetMl / 1000).toFixed(2)} L</span>
-        </div>
-      </div>`;
-      };
-
-      // The number's own geometry. Shared by both variants; only the wet fill
-      // differs. The sign is set smaller than the digits so "100%" clears the
-      // cup walls, which are only ~106 viewBox units apart at this height.
-      const SHARED_CSS = `
-        .hyd-pct { font-size: 40px; font-weight: 700; text-anchor: middle; letter-spacing: -1px; }
-        .hyd-pct-sign { font-size: 22px; }
-        .hyd-pct-dry { fill: var(--primary-text-color, #212121); }
-        /* The header no longer carries the number. */
-        .hyd-percent, .hyd-percent-only { display: none; }
-      `;
-
-      const makeCard = (pct, variantKey) => {
+      const makeCard = (pct) => {
         const el = document.createElement("personal-hydration-card");
-        if (variantKey) {
-          el._renderCup = proposedRenderCup;
-          const orig = el._styles.bind(el);
-          el._styles = () =>
-            orig() + `<style>${SHARED_CSS}\n${VARIANTS[variantKey].css}</style>`;
-        }
         el.setConfig({
           type: "custom:personal-hydration-card",
           profile: "loryan",
@@ -242,39 +169,29 @@ const buildSheet = async (page, { themeName, mode }) => {
         return row;
       };
 
-      const addCell = (row, label, pct, variantKey) => {
+      const addCell = (row, label, pct) => {
         const cell = document.createElement("div");
         cell.className = "cell";
         const cap = document.createElement("p");
         cap.className = "cap";
         cap.textContent = label;
         cell.appendChild(cap);
-        cell.appendChild(makeCard(pct, variantKey));
+        cell.appendChild(makeCard(pct));
         row.appendChild(cell);
       };
 
-      if (mode === "narrow") {
-        // 380px is the width check. 100% is the width-critical string.
-        for (const key of Object.keys(VARIANTS)) {
-          const row = section(VARIANTS[key].title, null);
-          addCell(row, "100% — widest string", 100, key);
-          addCell(row, "45% — split", 45, key);
-        }
-        return;
-      }
-
-      const now = section("Today — the number is a header row", "The row this change buys back.");
-      addCell(now, "45%", 45, null);
-
-      for (const key of Object.keys(VARIANTS)) {
-        const row = section(VARIANTS[key].title, VARIANTS[key].blurb);
-        for (const pct of LEVELS) {
-          const twoTone = pct >= 32 && pct <= 50 ? " — two-tone" : "";
-          addCell(row, `${pct}%${twoTone}`, pct, key);
-        }
+      const levels = mode === "narrow" ? [0, 1, 100] : LEVELS;
+      const row = section(
+        `The cup across its range — ${themeName} theme`,
+        "0% draws no water at all; 1% floors to a visible sliver; the number goes two-tone only between about 43% and 58%."
+      );
+      for (const pct of levels) {
+        const note =
+          pct === 0 ? " — empty" : pct === 1 ? " — floored sliver" : pct >= 43 && pct <= 58 ? " — two-tone" : "";
+        addCell(row, `${pct}%${note}`, pct);
       }
     },
-    { themeName, mode, THEMES, VARIANTS, LEVELS, TARGET_ML }
+    { themeName, mode, THEMES, LEVELS, TARGET_ML }
   );
 };
 
@@ -284,9 +201,9 @@ const browser = await chromium.launch({
 });
 
 const shots = [
-  { name: "percent-in-cup-light.png", theme: "light", mode: "wide", width: 1620 },
-  { name: "percent-in-cup-dark.png", theme: "dark", mode: "wide", width: 1620 },
-  { name: "percent-in-cup-380.png", theme: "light", mode: "narrow", width: 380 },
+  { name: "cup-range-light.png", theme: "light", mode: "wide", width: 1900 },
+  { name: "cup-range-dark.png", theme: "dark", mode: "wide", width: 1900 },
+  { name: "cup-range-380.png", theme: "dark", mode: "narrow", width: 380 },
 ];
 
 for (const shot of shots) {
