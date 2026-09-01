@@ -10,7 +10,7 @@
 
 const CARD_TAG = "personal-hydration-card";
 const EDITOR_TAG = "personal-hydration-card-editor";
-const CARD_VERSION = "0.3.1";
+const CARD_VERSION = "0.3.2";
 
 const ML_PER_FL_OZ = 29.5735;
 
@@ -69,6 +69,8 @@ class PersonalHydrationCard extends HTMLElement {
     this._customValue = "";
     this._customError = "";
     this._renderPending = false;
+    // Dirty-check key for the last shadow-DOM rebuild. See _render().
+    this._lastRenderKey = null;
   }
 
   static getStubConfig(hass) {
@@ -142,7 +144,7 @@ class PersonalHydrationCard extends HTMLElement {
 
     const profile = this._config.profile;
     if (!profile) {
-      this._renderError("Pick a profile in the card editor.");
+      this._renderError("Pick a profile in the card editor.", force);
       return;
     }
 
@@ -160,7 +162,8 @@ class PersonalHydrationCard extends HTMLElement {
 
     if (!target || !consumed) {
       this._renderError(
-        `No hydration profile found for "${profile}". Have you added the integration?`
+        `No hydration profile found for "${profile}". Have you added the integration?`,
+        force
       );
       return;
     }
@@ -181,6 +184,38 @@ class PersonalHydrationCard extends HTMLElement {
     // to render — turning the cup off must not silently cost you the number.
     const showCup = !!this._config.show_cup;
     const pctText = `${progressPct.toFixed(0)}%`;
+
+    // Dirty-check before touching the DOM. Home Assistant reassigns `hass`
+    // several times a second across the whole dashboard — most of those
+    // pushes touch no entity this card reads — and the 30s tick in `set
+    // hass` fires on the same schedule regardless of whether anything
+    // changed. Every one of those used to tear down and rebuild the entire
+    // shadow DOM (the full <style> block plus the SVG cup), which is what
+    // measured as ~0.8 of a CPU core, continuously, on a completely static
+    // dashboard (SHOCKWAVE wall panel, 2026-09-01). Skip the rebuild
+    // whenever nothing the markup actually depends on has moved. `force`
+    // (used to reopen/close/confirm the inline custom-amount field) always
+    // bypasses this, since those transitions must be reflected immediately.
+    const renderKey = JSON.stringify([
+      profile,
+      targetMl,
+      consumedMl,
+      remainingMl,
+      paceMl,
+      progressPct,
+      name,
+      showTitle,
+      showCup,
+      this._config.show_countdown,
+      this._config.show_manual,
+      unit,
+      this._config.quick_add,
+      this._customOpen,
+      this._customValue,
+      this._customError,
+    ]);
+    if (!force && renderKey === this._lastRenderKey) return;
+    this._lastRenderKey = renderKey;
 
     this.shadowRoot.innerHTML = `
       ${this._styles()}
@@ -205,7 +240,13 @@ class PersonalHydrationCard extends HTMLElement {
     if (this._config.show_manual) this._wireManualButtons();
   }
 
-  _renderError(msg) {
+  _renderError(msg, force) {
+    // Same dirty-check as _render(): an entity that stays missing/unavailable
+    // would otherwise still rebuild the whole subtree on every `hass` push.
+    const renderKey = `error:${msg}`;
+    if (!force && renderKey === this._lastRenderKey) return;
+    this._lastRenderKey = renderKey;
+
     this.shadowRoot.innerHTML = `
       ${this._styles()}
       <ha-card><div class="hyd-root"><div class="hyd-error">${msg}</div></div></ha-card>
