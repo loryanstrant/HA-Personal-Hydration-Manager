@@ -3,6 +3,41 @@
 Non-obvious choices and the reasoning behind them, newest first. Anything a future
 reader would otherwise have to re-derive — or worse, quietly undo.
 
+## 2026-09-01 — The card was rebuilding its whole shadow DOM on every `hass` push
+
+Measured on the SHOCKWAVE wall panel (a Lenovo ThinkSmart Hub running TouchKio, showing a
+static dashboard, nothing changing on screen): the panel sat at 90% of a CPU core. A/B on the
+live panel, same page, freshly reloaded each time — this card present vs. removed — isolated it
+to ~0.8 of a core, continuously, from a card showing numbers that were not moving.
+
+The cause was `set hass(hass)` calling `_render()` unconditionally, and `_render()` ending by
+reassigning `this.shadowRoot.innerHTML` — tearing down and rebuilding the entire `<style>` block
+and the animated SVG cup — every time. Home Assistant assigns `hass` to every card on a view
+several times a second (any entity update anywhere touches it, not just this card's own
+sensors), and the 30s tick in `set hass` was doing the same rebuild again regardless of whether
+anything had changed.
+
+The visual editor had already been rewritten this way once (see the entry below,
+2026-08-23) — built once, then only `.hass`/`.schema`/`.data` reassigned so Lit patches in
+place — but the card itself never got the same treatment.
+
+**The fix here is a dirty-check, not the full build-once/patch rewrite.** `_render()` now
+derives a key from everything the markup actually depends on (the five sensor-derived numbers,
+`name`, the four `show_*`/`unit`/`quick_add` config fields, and the inline custom-amount UI
+state) and returns before touching the DOM when the key matches the last render. `_renderError`
+does the same, keyed on the message, so a profile that stays missing/unavailable does not keep
+rebuilding either. `force` (used by `_openCustom`/`_closeCustom`/`_confirmCustom` to make the
+inline custom-amount field open, close, and show its error immediately) bypasses the check, same
+as it already bypassed the "field is open, hold off" guard above it.
+
+A true build-once/patch-in-place rewrite — matching the animated SVG cup, the two-tone
+percentage digits, and the custom-amount field's focus/typing state to individual attribute and
+text-node updates — would cut the cost further on days the numbers are genuinely changing, but
+that is a small fraction of the measured cost: the panel was idle. The dirty-check removes
+essentially all of it (a completely static dashboard now renders once, then not again until a
+sensor value or the config actually changes) at a fraction of the risk to the SVG waterline
+geometry and the custom-input focus handling documented in the two entries below.
+
 ## 2026-08-23 — The custom amount is typed on the card, not in a browser prompt
 
 `+ Custom…` called `window.prompt()` — browser chrome that ignores the theme, cannot be styled,
