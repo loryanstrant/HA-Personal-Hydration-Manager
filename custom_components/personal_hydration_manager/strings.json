@@ -10,8 +10,8 @@
           "gender": "Gender",
           "pregnancy": "Pregnancy (override target to 2,400 mL)",
           "lactation": "Lactation (override target to 3,000 mL)",
-          "day_start": "Day starts at (daily reset)",
-          "day_end": "Day ends at (used for pace calculation)",
+          "day_start": "Day starts at (pace window)",
+          "day_end": "Day ends at (pace window)",
           "source_sensor": "Optional source sensor",
           "source_mode": "Source mode",
           "unit": "Display unit"
@@ -22,8 +22,8 @@
           "gender": "Used with age to look up the recommended daily intake. From age 9 the recommendation differs; below that it is the same for everyone.",
           "pregnancy": "Replaces the age and gender recommendation with a flat 2,400 mL a day.",
           "lactation": "Replaces the age and gender recommendation with a flat 3,000 mL a day. Takes precedence over pregnancy if both are ticked.",
-          "day_start": "When today's total resets to zero. Set this to roughly when you wake up, so a late-night glass still counts towards the right day.",
-          "day_end": "When you stop counting for the day. The 'to stay on track' pace is how much you'd need to drink each hour between now and this time to reach the target.",
+          "day_start": "When you want to start drinking. This sets the pace, not the counter \u2014 today's total resets at midnight, so a 3am glass still counts towards the day it happened.",
+          "day_end": "When you want to be finished. The 'to stay on track' pace is how much you'd need to drink each hour to reach the target by this time, so it climbs if you fall behind. Before the day starts it shows the steady rate that would carry you across the whole window.",
           "source_sensor": "A sensor that already knows how much you've drunk — a smart bottle, for example. Leave this empty to log every drink by hand from the card or an automation.",
           "source_mode": "How to read the sensor above. Absolute: the sensor already shows today's running total, so use it as-is. Delta: the sensor counts up and resets unpredictably, so only add its increases. Sum: add the sensor's reading to whatever you've logged by hand.",
           "unit": "The units your figures are shown in. This changes the display only — nothing about how the total is stored or calculated."
@@ -57,8 +57,8 @@
           "gender": "Used with age to look up the recommended daily intake. From age 9 the recommendation differs; below that it is the same for everyone.",
           "pregnancy": "Replaces the age and gender recommendation with a flat 2,400 mL a day.",
           "lactation": "Replaces the age and gender recommendation with a flat 3,000 mL a day. Takes precedence over pregnancy if both are ticked.",
-          "day_start": "When today's total resets to zero. Set this to roughly when you wake up, so a late-night glass still counts towards the right day.",
-          "day_end": "When you stop counting for the day. The 'to stay on track' pace is how much you'd need to drink each hour between now and this time to reach the target.",
+          "day_start": "When you want to start drinking. This sets the pace, not the counter \u2014 today's total resets at midnight, so a 3am glass still counts towards the day it happened.",
+          "day_end": "When you want to be finished. The 'to stay on track' pace is how much you'd need to drink each hour to reach the target by this time, so it climbs if you fall behind. Before the day starts it shows the steady rate that would carry you across the whole window.",
           "source_sensor": "A sensor that already knows how much you've drunk — a smart bottle, for example. Leave this empty to log every drink by hand from the card or an automation.",
           "source_mode": "How to read the sensor above. Absolute: the sensor already shows today's running total, so use it as-is. Delta: the sensor counts up and resets unpredictably, so only add its increases. Sum: add the sensor's reading to whatever you've logged by hand.",
           "unit": "The units your figures are shown in. This changes the display only — nothing about how the total is stored or calculated."

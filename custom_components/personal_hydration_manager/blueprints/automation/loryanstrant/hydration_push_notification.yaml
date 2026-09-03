@@ -46,6 +46,12 @@ blueprint:
           domain: sensor
     pace_sensor:
       name: Hourly pace sensor
+      description: >-
+        The profile's `_hourly_pace` sensor. Before the profile's day-start time
+        this is the steady rate that would carry the whole day-start to day-end
+        window; inside the window it is the rate needed to finish by day end, so
+        it climbs if they fall behind. After day end it switches to the volume
+        still outstanding rather than a rate.
       selector:
         entity:
           domain: sensor

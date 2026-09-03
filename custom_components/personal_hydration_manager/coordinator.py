@@ -75,10 +75,15 @@ class HydrationCoordinator:
         self.last_reset_date: str = dt_util.now().date().isoformat()
         self.target_override_ml: float = 0.0
         # In delta mode this is the previous reading for delta calculation.
-        # In sum mode this is the latest known external reading that gets
-        # added to manual_consumed_ml. Survives bottle dropouts so the total
-        # holds steady at the last-known-good value until the next update.
+        # In sum mode this is the latest known external reading. Survives
+        # bottle dropouts so the total holds steady at the last-known-good
+        # value until the next update.
         self._last_source_value: float | None = None
+        # Sum mode only: the source's reading at the last reset. The source is
+        # an absolute daily counter, so what it contributes today is how far it
+        # has moved since the reset — not its whole total. Without this, any
+        # reset is undone by the very next source update.
+        self._source_baseline_ml: float = 0.0
 
         cfg = {**entry.data, **entry.options}
         self.name: str = cfg.get(CONF_NAME, "Hydration")
@@ -119,18 +124,41 @@ class HydrationCoordinator:
 
     @property
     def hourly_pace_ml(self) -> float:
-        """Recommended mL/h to finish by day_end (dynamic catch-up)."""
+        """Recommended mL/h across the day_start -> day_end window.
+
+        The window is what the pace is *for*: it describes the hours you want to
+        drink across, and nothing else. It does not gate what counts — water
+        drunk outside it still lands on the calendar day it happened.
+
+        Before the window opens: the steady rate that would carry you across the
+        whole window. Inside it: the rate needed to finish by day_end, so it
+        climbs if you fall behind. Past day_end there is no rate left to quote,
+        so it returns the outstanding volume for the card's "catch up: X mL".
+        """
         now = dt_util.now()
+        start_dt = now.replace(
+            hour=self.day_start.hour,
+            minute=self.day_start.minute,
+            second=self.day_start.second,
+            microsecond=0,
+        )
         end_dt = now.replace(
             hour=self.day_end.hour,
             minute=self.day_end.minute,
             second=self.day_end.second,
             microsecond=0,
         )
-        if end_dt <= now:
+        if end_dt <= start_dt:
+            # Empty or inverted window (an overnight window is not modelled).
+            # Fall back to the catch-up figure rather than dividing by <= 0.
+            return round(self.remaining_ml, 1)
+        if now >= end_dt:
             # Day is over — pace would be infinite. Return remaining as-is
             # so the card can say "catch up: X mL".
             return round(self.remaining_ml, 1)
+        if now < start_dt:
+            window_hours = (end_dt - start_dt).total_seconds() / 3600
+            return round(self.remaining_ml / window_hours, 1)
         hours_left = max((end_dt - now).total_seconds() / 3600, 0.25)
         return round(self.remaining_ml / hours_left, 1)
 
@@ -145,17 +173,26 @@ class HydrationCoordinator:
             )
             self.target_override_ml = float(stored.get("target_override_ml", 0.0))
             self._last_source_value = stored.get("last_source_value")
+            # Absent in stores written before 0.4.0. Defaulting to 0 reproduces
+            # the old arithmetic for one day rather than guessing: on load we
+            # cannot tell a legitimately-counted source total from a re-imported
+            # one, and guessing wrong would delete real water. The next reset
+            # establishes the true baseline.
+            self._source_baseline_ml = float(stored.get("source_baseline") or 0.0)
 
         # Catch up on any missed daily reset.
         await self._maybe_daily_reset()
 
-        # Schedule the daily reset at day_start.
+        # Schedule the daily reset at local midnight. This is the calendar-day
+        # boundary _maybe_daily_reset already keys off, and it matches the
+        # rollover of source sensors that count a day (a smart bottle), so the
+        # two totals agree. day_start is a pacing window, not a reset trigger.
         self._unsub_reset = async_track_time_change(
             self.hass,
             self._scheduled_reset,
-            hour=self.day_start.hour,
-            minute=self.day_start.minute,
-            second=self.day_start.second,
+            hour=0,
+            minute=0,
+            second=0,
         )
 
         # Re-emit pace every minute so the countdown stays current.
@@ -187,27 +224,53 @@ class HydrationCoordinator:
     def _scheduled_reset(self, _now: datetime) -> None:
         self.hass.async_create_task(self.async_reset_today())
 
-    async def _maybe_daily_reset(self) -> None:
-        today = dt_util.now().date().isoformat()
-        if self.last_reset_date != today:
-            self.consumed_ml = 0.0
-            self.manual_consumed_ml = 0.0
-            self.last_reset_date = today
-            self._last_source_value = None
-            await self._save()
+    def _reset_state(self) -> None:
+        """Zero today's counters. The single definition of what a reset means.
 
-    async def async_reset_today(self) -> None:
+        Both reset paths call this. They used to carry their own copy, and the
+        copies had to agree about _last_source_value — which is exactly where
+        the sum-mode re-import bug lived.
+        """
         self.consumed_ml = 0.0
         self.manual_consumed_ml = 0.0
         self.last_reset_date = dt_util.now().date().isoformat()
-        self._last_source_value = None
+        if self.source_mode == SOURCE_MODE_SUM:
+            # Hold on to the reading and move the baseline up to it, so the
+            # source contributes only what it counts from here on. Clearing the
+            # reading instead would make the next update re-import the source's
+            # whole daily total and undo this reset.
+            self._source_baseline_ml = self._last_source_value or 0.0
+        else:
+            # Delta mode needs the next reading to rebaseline silently rather
+            # than arrive as one large delta; absolute mode overwrites anyway.
+            self._last_source_value = None
+            self._source_baseline_ml = 0.0
+
+    async def _maybe_daily_reset(self) -> None:
+        today = dt_util.now().date().isoformat()
+        if self.last_reset_date != today:
+            self._reset_state()
+            await self._save()
+
+    async def async_reset_today(self) -> None:
+        self._reset_state()
         await self._save()
         self._dispatch()
 
+    def _source_contribution_ml(self) -> float:
+        """How much the source sensor contributes today, in sum mode.
+
+        The source is an absolute daily counter, so its contribution is how far
+        it has moved since the baseline set at the last reset — never its whole
+        total, and never negative.
+        """
+        return max(0.0, (self._last_source_value or 0.0) - self._source_baseline_ml)
+
     def _recompute_sum_consumed(self) -> None:
         """Refresh consumed_ml from manual + external in sum mode."""
-        external = self._last_source_value or 0.0
-        self.consumed_ml = max(0.0, self.manual_consumed_ml + external)
+        self.consumed_ml = max(
+            0.0, self.manual_consumed_ml + self._source_contribution_ml()
+        )
 
     async def async_add_drink(self, volume: float, unit: str) -> None:
         await self._maybe_daily_reset()
@@ -227,8 +290,9 @@ class HydrationCoordinator:
         target_ml = max(0.0, to_ml(float(volume), unit))
         if self.source_mode == SOURCE_MODE_SUM:
             # Solve for manual so that manual + external == target.
-            external = self._last_source_value or 0.0
-            self.manual_consumed_ml = max(0.0, target_ml - external)
+            self.manual_consumed_ml = max(
+                0.0, target_ml - self._source_contribution_ml()
+            )
             self._recompute_sum_consumed()
         else:
             self.consumed_ml = target_ml
@@ -264,11 +328,15 @@ class HydrationCoordinator:
             self.consumed_ml = max(0.0, value)
             self._last_source_value = value
         elif self.source_mode == SOURCE_MODE_SUM:
-            # Sum mode: external reading is added to manual_consumed_ml.
-            # Holding _last_source_value at the latest known value means a
-            # bottle dropout leaves the total unchanged until it reports again,
-            # which is exactly the resilience the user is after.
+            # Sum mode: the source's movement since the baseline is added to
+            # manual_consumed_ml. Holding _last_source_value at the latest known
+            # value means a bottle dropout leaves the total unchanged until it
+            # reports again, which is exactly the resilience the user is after.
             self._last_source_value = value
+            if value < self._source_baseline_ml:
+                # The source rolled over its own day, or was reset or replaced.
+                # Everything it reports from here is new water.
+                self._source_baseline_ml = 0.0
             self._recompute_sum_consumed()
         else:
             # Delta mode: add positive deltas only.
@@ -289,6 +357,7 @@ class HydrationCoordinator:
                 "last_reset_date": self.last_reset_date,
                 "target_override_ml": self.target_override_ml,
                 "last_source_value": self._last_source_value,
+                "source_baseline": self._source_baseline_ml,
             }
         )
 

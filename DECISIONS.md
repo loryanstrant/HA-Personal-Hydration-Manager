@@ -3,6 +3,61 @@
 Non-obvious choices and the reasoning behind them, newest first. Anything a future
 reader would otherwise have to re-derive — or worse, quietly undo.
 
+## 2026-09-03 — `day_start` was gating the wrong thing, and its reset was broken anyway
+
+`sensor.phm_loryan_consumed_today` read **621 mL** in prod with nothing drunk and nothing logged.
+Two defects, found together because one hid the other.
+
+**The reset was undone by the next source update.** In `sum` mode the source sensor is an absolute
+daily counter, but both reset paths cleared `_last_source_value = None` and
+`_recompute_sum_consumed()` was `manual + (_last_source_value or 0)`. So the next `state_changed`
+assigned the reading straight back and re-adopted the source's **entire daily total**. On the day:
+PHM reset to 0.0 at 07:00:00, and was back at 621.0 at 09:01:18 when an HA restart re-created the
+source entity and fired a state change.
+
+**The restart was a trigger, not the cause.** The two hours in between only looked healthy because
+`sensor.h2o548d8_water_today` sat constant at 621, so no event fired. A genuine sip at 07:30 would
+have done exactly the same thing — and every reset since the mode shipped had the same hole. Any
+incident report that stops at "the restart did it" leaves the bug in place.
+
+The fix is a **baseline**: the source's reading at the last reset, persisted alongside it, with the
+source contributing `max(0, value − baseline)`. Three things make it hold:
+
+- The reset **keeps** `_last_source_value` and moves the baseline up to it, rather than clearing
+  the reading. Clearing was the bug.
+- `value < baseline` re-baselines to **0** — the source rolled over its own midnight, was reset, or
+  was replaced, and everything it reports from here is new water.
+- Both reset paths now call one `_reset_state()`. The bug existed because two copies of the same
+  reset had to agree about `_last_source_value`, and agreeing is not something two copies do.
+
+A store written before 0.4.0 has no baseline key and loads as `0.0`, which reproduces the old
+arithmetic for one day. That is deliberate: **on load we cannot tell a legitimately-counted source
+total from a re-imported one**, and guessing would delete real water from installs that were
+correct. The next midnight sets the true baseline; `reset_today` fixes it immediately.
+
+**And `day_start` was gating the wrong thing entirely.** It scheduled the daily reset and played no
+part in `hourly_pace_ml`, which only ever looked at `day_end`. Both are now inverted:
+
+- **The reset moved to local midnight.** That is the boundary `_maybe_daily_reset` already keyed off
+  — the scheduled reset at `day_start` was a second, contradictory one — and it matches the
+  rollover of a source that counts a calendar day, so the two totals agree instead of drifting for
+  the hours between midnight and `day_start`. Water drunk at 3am now counts towards the day it
+  happened. The old flow copy promised exactly this and the code did the opposite.
+- **`day_start` → `day_end` became the pace window.** Before it opens, the pace is the steady rate
+  across the whole window; inside it, the rate needed to finish by `day_end`, which is the existing
+  catch-up behaviour untouched.
+
+**The principle worth keeping: a window that describes when you want to drink must not silently
+discard water drunk outside it.** `day_start` was doing double duty as a reset trigger and a
+notional pacing window; it was quietly bad at the first job and not doing the second at all.
+
+Two things left deliberately alone. Past `day_end` the sensor still returns a **volume** while
+labelled `mL/h` — the card needs that number to say "catch up: X mL", and giving the sensor two
+units is a worse trade than one wart, now documented. And the blueprints keep their own
+`earliest_hour`/`latest_hour` inputs rather than reading the new `day_start`/`day_end` attributes on
+the pace sensor: switching them would silently change the quiet hours of every automation already
+running. The attributes exist so anyone who wants the real window can template off it.
+
 ## 2026-09-01 — The card was rebuilding its whole shadow DOM on every `hass` push
 
 Measured on the SHOCKWAVE wall panel (a Lenovo ThinkSmart Hub running TouchKio, showing a
