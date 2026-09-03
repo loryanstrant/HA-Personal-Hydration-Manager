@@ -29,7 +29,7 @@ Targets are derived from the **National Academies of Sciences, Engineering, and 
 ## Features
 
 - **Multiple profile support** — each household member can have their own config entry, sensors, and dashboard card.
-- **Smart pace calculation** — dynamic catch-up: as the day progresses, the recommended hourly pace adjusts based on what you've already drunk and how many hours remain until your usual bedtime.
+- **Smart pace calculation** — dynamic catch-up across your **day start → day end** window: the recommended hourly pace adjusts to what you've already drunk and how many hours of that window remain, so it climbs if you fall behind.
 - **Three card views, mix-and-match** — animated cup fill, countdown + pace, and one-tap manual add.
 - **Visual card editor** with a preview tile in the dashboard card picker.
 - **Two data input modes, both supported in the same config**:
@@ -38,7 +38,7 @@ Targets are derived from the **National Academies of Sciences, Engineering, and 
 - **Services** for logging drinks, resetting the day, or setting an absolute consumed value.
 - **Two automation blueprints** included — confirmation-required push notification, and a TTS reminder.
 - **Metric default with mL ⇄ fl oz toggle** in the card editor.
-- **Daily reset at your configured start-of-day time**, persisted across HA restarts.
+- **Daily reset at local midnight**, persisted across HA restarts — so it agrees with a source sensor that counts a calendar day, and a 3am glass counts towards the day it happened.
 
 <img width="521" height="420" alt="image" src="https://github.com/user-attachments/assets/5d6ba709-2798-47ec-b98f-a37cd73f2741" />
 
@@ -68,10 +68,10 @@ Add one integration entry per person. Fields:
 | Gender | Male / Female — selects the matching NASEM row |
 | Pregnancy | Overrides target to 2,400 mL |
 | Lactation | Overrides target to 3,000 mL |
-| Day start | When the daily counter resets |
-| Day end | Used by the hourly-pace calculation |
+| Day start | When you want to start drinking. Opens the pace window — it does **not** reset the counter (that happens at midnight) |
+| Day end | When you want to be finished. Closes the pace window |
 | Source sensor (optional) | Sensor entity tracking consumed volume |
-| Source mode | `absolute` (sensor state = today's total) or `delta` (sum the increases) |
+| Source mode | `absolute` (sensor state = today's total), `delta` (add only the increases), or `sum` (manual entries **+** how far the sensor has moved since the last reset) |
 
 You can change any of these later via the integration's **Configure** button.
 
@@ -83,10 +83,25 @@ All entities are prefixed with `phm_` so they group together in the entity list.
 |--------|------|-------------|
 | `sensor.phm_<name>_daily_target` | mL | NASEM target (or override) |
 | `sensor.phm_<name>_consumed_today` | mL | Total consumed today |
+| `sensor.phm_<name>_manual_consumed` | mL | Total logged by hand today (services, card, blueprints) |
 | `sensor.phm_<name>_remaining` | mL | Target − consumed (≥ 0) |
-| `sensor.phm_<name>_hourly_pace` | mL/h | `remaining / hours_left_until_day_end` |
+| `sensor.phm_<name>_hourly_pace` | mL/h | See **Pace** below. Attributes: `pace_ml_per_h`, `day_start`, `day_end` |
 | `sensor.phm_<name>_progress` | % | `consumed / target` |
 | `number.phm_<name>_target_override` | mL | Set > 0 to override NASEM; `0` to use NASEM |
+
+### Pace
+
+`sensor.phm_<name>_hourly_pace` answers "how fast do I need to drink?", and the answer depends on
+where you are in the **day start → day end** window:
+
+| When | Value |
+|------|-------|
+| Before day start | `remaining / (day_end − day_start)` — the steady rate across the whole window |
+| Inside the window | `remaining / hours_left_until_day_end` — climbs if you fall behind |
+| After day end | `remaining` — there is no rate left to quote, so the card says "catch up: X mL" |
+
+The window changes only the **pace**. It never changes what counts: every drink lands on the
+calendar day it happened, and the daily total resets at midnight.
 
 ## Services
 

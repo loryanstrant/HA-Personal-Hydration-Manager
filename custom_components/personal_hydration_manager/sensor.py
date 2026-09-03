@@ -210,7 +210,13 @@ class HourlyPaceSensor(_BaseHydrationSensor):
 
     @property
     def extra_state_attributes(self) -> dict:
-        return {"pace_ml_per_h": self._coordinator.hourly_pace_ml}
+        # The window is published so an automation can read the real thing
+        # instead of hardcoding hours that then drift from the profile.
+        return {
+            "pace_ml_per_h": self._coordinator.hourly_pace_ml,
+            "day_start": self._coordinator.day_start.isoformat(),
+            "day_end": self._coordinator.day_end.isoformat(),
+        }
 
 
 class ProgressSensor(_BaseHydrationSensor):
