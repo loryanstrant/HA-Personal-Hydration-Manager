@@ -3,6 +3,16 @@
 Non-obvious choices and the reasoning behind them, newest first. Anything a future
 reader would otherwise have to re-derive — or worse, quietly undo.
 
+## 2026-10-05 — A card module must have one loader, not two
+
+Issue #15 reported an intermittent `Custom element doesn't exist: personal-hydration-card`, most often on mobile and tablets. Production browser diagnostics reproduced the decisive state: `/personal_hydration_manager_static/personal-hydration-card.js?v=0.4.0` returned 200 and printed its console banner, but `customElements.get("personal-hydration-card")` was still undefined.
+
+The bundle was registered twice: first with frontend `add_extra_js_url()`, then as a storage-mode Lovelace resource. The first path can execute during Home Assistant's bootstrap against the temporary custom-element registry. HA then replaces that registry; the definition disappears, while the browser's module cache prevents the identical Lovelace resource URL from executing a second time. A reload may change the timing, which explains why the same dashboard worked on different devices at different times.
+
+Storage-mode dashboards now use only the managed Lovelace resource. YAML mode has no resource collection, so only it receives the `extra_js_url` fallback. Registration also reconciles stale entries to one current module URL and removes duplicates.
+
+**Lesson:** two independent loaders for one ES module are not redundancy when frontend bootstrap swaps global registries; choose one loader per mode and make its persisted registration idempotent.
+
 ## 2026-09-03 — `day_start` was gating the wrong thing, and its reset was broken anyway
 
 `sensor.phm_loryan_consumed_today` read **621 mL** in prod with nothing drunk and nothing logged.

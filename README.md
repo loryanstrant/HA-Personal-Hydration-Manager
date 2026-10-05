@@ -51,7 +51,7 @@ Targets are derived from the **National Academies of Sciences, Engineering, and 
 3. Install **Personal Hydration Manager**, then **restart Home Assistant**.
 4. Settings → Devices & Services → **Add Integration** → Personal Hydration Manager.
 
-The dashboard card and blueprints are registered automatically — no manual resource step.
+The dashboard card and blueprints are registered automatically — no manual resource step. Storage-mode dashboards load the card through one managed Lovelace resource; YAML-mode dashboards use Home Assistant's frontend module fallback.
 
 ### Manual
 

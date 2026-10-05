@@ -1,21 +1,15 @@
-"""Serve the Lovelace card and register it as a dashboard resource.
+"""Serve the Lovelace card and register exactly one module loader.
 
-Two-pronged registration so the card is reliably picked up:
-
-1.  Serve the bundled JS at a stable URL via ``async_register_static_paths`` and
-    add it as a frontend extra-module via ``add_extra_js_url``. This covers
-    YAML-mode dashboards and is what shows the card in the card picker.
-
-2.  When Lovelace is in storage mode (the default for most users), also write
-    a ``lovelace_resources`` entry so the card loads even after the user
-    clears their browser cache and even on dashboards that have not been
-    edited yet.
-
-Re-running registration on every entry setup is safe — both helpers dedupe
-on the URL.
+Storage-mode dashboards load the bundle through ``lovelace_resources``. YAML-mode
+dashboards have no resource collection, so only they use ``add_extra_js_url``.
+Loading the same URL through both mechanisms is unsafe during frontend bootstrap:
+the extra module can define the card on Home Assistant's temporary custom-element
+registry, then the later Lovelace import is skipped by the browser module cache.
 """
+
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -26,7 +20,7 @@ from homeassistant.setup import async_when_setup
 
 _LOGGER = logging.getLogger(__name__)
 
-CARD_VERSION = "0.4.0"
+CARD_VERSION = "0.4.1"
 STATIC_URL_BASE = "/personal_hydration_manager_static"
 CARD_FILE = "personal-hydration-card.js"
 CARD_URL = f"{STATIC_URL_BASE}/{CARD_FILE}"
@@ -34,6 +28,8 @@ CARD_URL_VERSIONED = f"{CARD_URL}?v={CARD_VERSION}"
 
 _DATA_STATIC = "personal_hydration_manager_static_registered"
 _DATA_EXTRA_JS = "personal_hydration_manager_extra_js_registered"
+_DATA_LOVELACE_WAIT = "personal_hydration_manager_lovelace_wait_registered"
+_DATA_LOVELACE_LOCK = "personal_hydration_manager_lovelace_resource_lock"
 
 
 async def async_register_frontend(hass: HomeAssistant) -> None:
@@ -57,25 +53,33 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
             _LOGGER.debug("Static path already registered: %s", err)
             hass.data[_DATA_STATIC] = True
 
-    # 2. Inject the card as a frontend ES module — handles YAML dashboards
-    #    and the card picker.
+    # 2. Choose one loader after Lovelace is ready. Storage-mode dashboards use
+    #    their resource collection; YAML mode has no collection and falls back
+    #    to frontend extra modules. Never register both for the same URL.
+    if hass.data.get("lovelace") is not None:
+        await _async_register_card_loader(hass)
+    elif not hass.data.get(_DATA_LOVELACE_WAIT):
+        hass.data[_DATA_LOVELACE_WAIT] = True
+
+        async def _on_lovelace_ready(_hass: HomeAssistant, _component: str) -> None:
+            _hass.data.pop(_DATA_LOVELACE_WAIT, None)
+            await _async_register_card_loader(_hass)
+
+        async_when_setup(hass, "lovelace", _on_lovelace_ready)
+
+
+async def _async_register_card_loader(hass: HomeAssistant) -> None:
+    """Register the card through the loader appropriate to Lovelace's mode."""
+    lovelace_data = hass.data.get("lovelace")
+    resources = getattr(lovelace_data, "resources", None)
+    if resources is not None and hasattr(resources, "async_create_item"):
+        await _async_register_lovelace_resource(hass)
+        return
+
     if not hass.data.get(_DATA_EXTRA_JS):
         add_extra_js_url(hass, CARD_URL_VERSIONED)
         hass.data[_DATA_EXTRA_JS] = True
-
-    # 3. Belt-and-braces: register it in the Lovelace resources collection
-    #    used by storage-mode dashboards. This is the same store HACS writes
-    #    to and is what makes cards survive cache wipes and fresh dashboards.
-    #    If Lovelace hasn't loaded yet (cold-start race), defer until it has —
-    #    silently bailing here used to leave the resource permanently
-    #    unregistered until the next HA restart with the right ordering.
-    if hass.data.get("lovelace") is not None:
-        await _async_register_lovelace_resource(hass)
-    else:
-        async def _on_lovelace_ready(_hass: HomeAssistant, _component: str) -> None:
-            await _async_register_lovelace_resource(_hass)
-
-        async_when_setup(hass, "lovelace", _on_lovelace_ready)
+        _LOGGER.debug("Registered hydration card as YAML-mode extra module")
 
 
 async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
@@ -91,28 +95,46 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
         _LOGGER.debug("Lovelace is in YAML mode — using extra_js_url only")
         return
 
-    # Make sure the collection has loaded its items at least once.
-    if hasattr(resources, "async_load") and not getattr(resources, "loaded", True):
+    lock = hass.data.setdefault(_DATA_LOVELACE_LOCK, asyncio.Lock())
+    async with lock:
         try:
-            await resources.async_load()
-        except Exception as err:  # pragma: no cover - defensive
-            _LOGGER.debug("Could not pre-load Lovelace resources: %s", err)
+            # Make sure the collection has loaded its items at least once.
+            if hasattr(resources, "async_load") and not getattr(
+                resources, "loaded", True
+            ):
+                await resources.async_load()
 
-    existing = None
-    for item in resources.async_items():
-        url = item.get("url", "")
-        if url.split("?", 1)[0] == CARD_URL:
-            existing = item
-            break
+            existing = [
+                item
+                for item in resources.async_items()
+                if item.get("url", "").split("?", 1)[0] == CARD_URL
+            ]
+            payload = {"res_type": "module", "url": CARD_URL_VERSIONED}
 
-    payload = {"res_type": "module", "url": CARD_URL_VERSIONED}
+            if not existing:
+                await resources.async_create_item(payload)
+                _LOGGER.info(
+                    "Registered hydration card as Lovelace resource %s",
+                    CARD_URL_VERSIONED,
+                )
+                return
 
-    try:
-        if existing is None:
-            await resources.async_create_item(payload)
-            _LOGGER.info("Registered hydration card as Lovelace resource %s", CARD_URL_VERSIONED)
-        elif existing.get("url") != CARD_URL_VERSIONED:
-            await resources.async_update_item(existing["id"], payload)
-            _LOGGER.info("Updated hydration card Lovelace resource to %s", CARD_URL_VERSIONED)
-    except Exception as err:  # pragma: no cover - defensive
-        _LOGGER.warning("Could not register Lovelace resource: %s", err)
+            primary, *duplicates = existing
+            if (
+                primary.get("url") != CARD_URL_VERSIONED
+                or primary.get("res_type") != "module"
+            ):
+                await resources.async_update_item(primary["id"], payload)
+                _LOGGER.info(
+                    "Updated hydration card Lovelace resource to %s",
+                    CARD_URL_VERSIONED,
+                )
+
+            for duplicate in duplicates:
+                await resources.async_delete_item(duplicate["id"])
+                _LOGGER.info(
+                    "Removed duplicate hydration card Lovelace resource %s",
+                    duplicate["id"],
+                )
+        except Exception as err:  # noqa: BLE001  # pragma: no cover - optional UI
+            _LOGGER.warning("Could not register Lovelace resource: %s", err)
