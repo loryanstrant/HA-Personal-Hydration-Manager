@@ -1,0 +1,1401 @@
+{
+  "schema_version": "1.0",
+  "repository": "HA-Personal-Hydration-Manager",
+  "identity": {
+    "description": "A Home Assistant integration to track daily water intake for one or more people in your household, with a built-in dashboard card.",
+    "default_branch": "main",
+    "languages": {
+      "Python": 15,
+      "JavaScript": 5
+    },
+    "topics": [],
+    "licence": "MIT License",
+    "file_count": 51
+  },
+  "start_here": {
+    "readme": "README.md",
+    "agents_md": "AGENTS.md",
+    "entry_points": [],
+    "decision_records": [
+      "DECISIONS.md"
+    ],
+    "build_config": [
+      "custom_components/personal_hydration_manager/manifest.json",
+      "hacs.json",
+      "pytest.ini"
+    ],
+    "source_roots": [
+      "custom_components",
+      "scripts"
+    ]
+  },
+  "documentation": [
+    {
+      "path": ".github/copilot-instructions.md",
+      "title": "Copilot instructions — HA-Personal-Hydration-Manager",
+      "lines": 56,
+      "headings": [
+        {
+          "level": 2,
+          "text": "What this repo is",
+          "anchor": "what-this-repo-is"
+        },
+        {
+          "level": 2,
+          "text": "Repo shape",
+          "anchor": "repo-shape"
+        },
+        {
+          "level": 2,
+          "text": "Conventions",
+          "anchor": "conventions"
+        },
+        {
+          "level": 2,
+          "text": "Never",
+          "anchor": "never"
+        }
+      ]
+    },
+    {
+      "path": "DECISIONS.md",
+      "title": "Decisions",
+      "lines": 334,
+      "headings": [
+        {
+          "level": 2,
+          "text": "2026-10-05 — A card module must have one loader, not two",
+          "anchor": "2026-10-05--a-card-module-must-have-one-loader-not-two"
+        },
+        {
+          "level": 2,
+          "text": "2026-09-03 — day_start was gating the wrong thing, and its reset was broken anyway",
+          "anchor": "2026-09-03--day_start-was-gating-the-wrong-thing-and-its-reset-was-broken-anyway"
+        },
+        {
+          "level": 2,
+          "text": "2026-09-01 — The card was rebuilding its whole shadow DOM on every hass push",
+          "anchor": "2026-09-01--the-card-was-rebuilding-its-whole-shadow-dom-on-every-hass-push"
+        },
+        {
+          "level": 2,
+          "text": "2026-08-23 — The custom amount is typed on the card, not in a browser prompt",
+          "anchor": "2026-08-23--the-custom-amount-is-typed-on-the-card-not-in-a-browser-prompt"
+        },
+        {
+          "level": 2,
+          "text": "2026-08-23 — The card editor is built on ha-form",
+          "anchor": "2026-08-23--the-card-editor-is-built-on-ha-form"
+        },
+        {
+          "level": 2,
+          "text": "2026-08-23 — The two blueprint copies are reconciled, and guarded by tests",
+          "anchor": "2026-08-23--the-two-blueprint-copies-are-reconciled-and-guarded-by-tests"
+        },
+        {
+          "level": 2,
+          "text": "2026-08-23 — This repo has packaging tests now, and they found three more faults",
+          "anchor": "2026-08-23--this-repo-has-packaging-tests-now-and-they-found-three-more-faults"
+        },
+        {
+          "level": 2,
+          "text": "2026-08-31 — The percentage moved into the cup, and needed two of itself to do it",
+          "anchor": "2026-08-31--the-percentage-moved-into-the-cup-and-needed-two-of-itself-to-do-it"
+        },
+        {
+          "level": 2,
+          "text": "2026-09-01 — An empty cup was drawing water, and five places recorded the wrong formula",
+          "anchor": "2026-09-01--an-empty-cup-was-drawing-water-and-five-places-recorded-the-wrong-formula"
+        }
+      ]
+    },
+    {
+      "path": "README.md",
+      "title": "Personal Hydration Manager",
+      "lines": 197,
+      "headings": [
+        {
+          "level": 2,
+          "text": "Features",
+          "anchor": "features"
+        },
+        {
+          "level": 2,
+          "text": "Installation",
+          "anchor": "installation"
+        },
+        {
+          "level": 3,
+          "text": "Via HACS (recommended)",
+          "anchor": "via-hacs-recommended"
+        },
+        {
+          "level": 3,
+          "text": "Manual",
+          "anchor": "manual"
+        },
+        {
+          "level": 2,
+          "text": "Configuration",
+          "anchor": "configuration"
+        },
+        {
+          "level": 2,
+          "text": "Entities created per profile",
+          "anchor": "entities-created-per-profile"
+        },
+        {
+          "level": 3,
+          "text": "Pace",
+          "anchor": "pace"
+        },
+        {
+          "level": 2,
+          "text": "Services",
+          "anchor": "services"
+        },
+        {
+          "level": 3,
+          "text": "personal_hydration_manager.log_drink",
+          "anchor": "personal_hydration_managerlog_drink"
+        },
+        {
+          "level": 3,
+          "text": "personal_hydration_manager.reset_today",
+          "anchor": "personal_hydration_managerreset_today"
+        },
+        {
+          "level": 3,
+          "text": "personal_hydration_manager.set_consumed",
+          "anchor": "personal_hydration_managerset_consumed"
+        },
+        {
+          "level": 2,
+          "text": "Listening for drink events (third-party integrations)",
+          "anchor": "listening-for-drink-events-third-party-integrations"
+        },
+        {
+          "level": 2,
+          "text": "The dashboard card",
+          "anchor": "the-dashboard-card"
+        },
+        {
+          "level": 2,
+          "text": "Blueprints",
+          "anchor": "blueprints"
+        },
+        {
+          "level": 2,
+          "text": "Calculation reference",
+          "anchor": "calculation-reference"
+        },
+        {
+          "level": 2,
+          "text": "Development",
+          "anchor": "development"
+        },
+        {
+          "level": 2,
+          "text": "Contributing",
+          "anchor": "contributing"
+        },
+        {
+          "level": 2,
+          "text": "Disclaimer",
+          "anchor": "disclaimer"
+        }
+      ]
+    },
+    {
+      "path": "docs/specs/card-editor-ha-form.md",
+      "title": "Spec — Card editor on ha-form",
+      "lines": 170,
+      "headings": [
+        {
+          "level": 2,
+          "text": "Problem",
+          "anchor": "problem"
+        },
+        {
+          "level": 2,
+          "text": "Scope",
+          "anchor": "scope"
+        },
+        {
+          "level": 2,
+          "text": "Constraints found before designing",
+          "anchor": "constraints-found-before-designing"
+        },
+        {
+          "level": 2,
+          "text": "Flow",
+          "anchor": "flow"
+        },
+        {
+          "level": 2,
+          "text": "Design",
+          "anchor": "design"
+        },
+        {
+          "level": 3,
+          "text": "States",
+          "anchor": "states"
+        },
+        {
+          "level": 2,
+          "text": "Acceptance criteria",
+          "anchor": "acceptance-criteria"
+        },
+        {
+          "level": 2,
+          "text": "Non-goals",
+          "anchor": "non-goals"
+        },
+        {
+          "level": 2,
+          "text": "What shipped",
+          "anchor": "what-shipped"
+        }
+      ]
+    },
+    {
+      "path": "docs/specs/custom-amount-inline.md",
+      "title": "Spec — The custom amount is entered on the card",
+      "lines": 78,
+      "headings": [
+        {
+          "level": 2,
+          "text": "Problem",
+          "anchor": "problem"
+        },
+        {
+          "level": 2,
+          "text": "Constraint that shapes the design",
+          "anchor": "constraint-that-shapes-the-design"
+        },
+        {
+          "level": 2,
+          "text": "Flow",
+          "anchor": "flow"
+        },
+        {
+          "level": 2,
+          "text": "Design",
+          "anchor": "design"
+        },
+        {
+          "level": 3,
+          "text": "States",
+          "anchor": "states"
+        },
+        {
+          "level": 2,
+          "text": "Acceptance criteria",
+          "anchor": "acceptance-criteria"
+        },
+        {
+          "level": 2,
+          "text": "Non-goals",
+          "anchor": "non-goals"
+        },
+        {
+          "level": 2,
+          "text": "What shipped",
+          "anchor": "what-shipped"
+        }
+      ]
+    },
+    {
+      "path": "docs/specs/empty-cup-looks-empty.md",
+      "title": "Spec — An empty cup looks empty",
+      "lines": 108,
+      "headings": [
+        {
+          "level": 2,
+          "text": "Problem",
+          "anchor": "problem"
+        },
+        {
+          "level": 2,
+          "text": "The rule",
+          "anchor": "the-rule"
+        },
+        {
+          "level": 2,
+          "text": "Design",
+          "anchor": "design"
+        },
+        {
+          "level": 3,
+          "text": "The knock-on",
+          "anchor": "the-knock-on"
+        },
+        {
+          "level": 3,
+          "text": "States",
+          "anchor": "states"
+        },
+        {
+          "level": 2,
+          "text": "Acceptance criteria",
+          "anchor": "acceptance-criteria"
+        },
+        {
+          "level": 2,
+          "text": "Non-goals",
+          "anchor": "non-goals"
+        },
+        {
+          "level": 2,
+          "text": "What shipped",
+          "anchor": "what-shipped"
+        }
+      ]
+    },
+    {
+      "path": "docs/specs/percent-inside-cup.md",
+      "title": "Spec — The percentage is displayed inside the cup",
+      "lines": 149,
+      "headings": [
+        {
+          "level": 2,
+          "text": "Problem",
+          "anchor": "problem"
+        },
+        {
+          "level": 2,
+          "text": "Constraint that shapes the design",
+          "anchor": "constraint-that-shapes-the-design"
+        },
+        {
+          "level": 2,
+          "text": "Design",
+          "anchor": "design"
+        },
+        {
+          "level": 3,
+          "text": "What moves and what doesn't",
+          "anchor": "what-moves-and-what-doesnt"
+        },
+        {
+          "level": 3,
+          "text": "States",
+          "anchor": "states"
+        },
+        {
+          "level": 3,
+          "text": "Accessibility",
+          "anchor": "accessibility"
+        },
+        {
+          "level": 2,
+          "text": "Acceptance criteria",
+          "anchor": "acceptance-criteria"
+        },
+        {
+          "level": 2,
+          "text": "Non-goals",
+          "anchor": "non-goals"
+        },
+        {
+          "level": 2,
+          "text": "What shipped",
+          "anchor": "what-shipped"
+        }
+      ]
+    },
+    {
+      "path": "info.md",
+      "title": "Personal Hydration Manager",
+      "lines": 16,
+      "headings": [
+        {
+          "level": 2,
+          "text": "What you get",
+          "anchor": "what-you-get"
+        },
+        {
+          "level": 2,
+          "text": "Calculation source",
+          "anchor": "calculation-source"
+        }
+      ]
+    }
+  ],
+  "code": {
+    "source_roots": [
+      "custom_components",
+      "scripts"
+    ],
+    "symbol_source": "repomix (tree-sitter signatures)",
+    "routes": [],
+    "files": [
+      {
+        "path": "custom_components/personal_hydration_manager/__init__.py",
+        "symbols": [
+          {
+            "kind": "const",
+            "name": "CONFIG_SCHEMA",
+            "parent": "",
+            "signature": "CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)"
+          },
+          {
+            "kind": "const",
+            "name": "SERVICE_LOG_DRINK_SCHEMA",
+            "parent": "",
+            "signature": "SERVICE_LOG_DRINK_SCHEMA = vol.Schema("
+          },
+          {
+            "kind": "const",
+            "name": "SERVICE_RESET_SCHEMA",
+            "parent": "",
+            "signature": "SERVICE_RESET_SCHEMA = vol.Schema({vol.Required(ATTR_PROFILE): cv.string})"
+          },
+          {
+            "kind": "const",
+            "name": "SERVICE_SET_CONSUMED_SCHEMA",
+            "parent": "",
+            "signature": "SERVICE_SET_CONSUMED_SCHEMA = vol.Schema("
+          },
+          {
+            "kind": "function",
+            "name": "async_setup",
+            "parent": "",
+            "signature": "async_setup(hass: HomeAssistant, config: dict) -> bool"
+          },
+          {
+            "kind": "function",
+            "name": "handle_log_drink",
+            "parent": "",
+            "signature": "handle_log_drink(call: ServiceCall) -> None"
+          },
+          {
+            "kind": "function",
+            "name": "handle_reset_today",
+            "parent": "",
+            "signature": "handle_reset_today(call: ServiceCall) -> None"
+          },
+          {
+            "kind": "function",
+            "name": "handle_set_consumed",
+            "parent": "",
+            "signature": "handle_set_consumed(call: ServiceCall) -> None"
+          },
+          {
+            "kind": "function",
+            "name": "handle_drink_event",
+            "parent": "",
+            "signature": "handle_drink_event(event) -> None"
+          },
+          {
+            "kind": "function",
+            "name": "async_setup_entry",
+            "parent": "",
+            "signature": "async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool"
+          },
+          {
+            "kind": "function",
+            "name": "async_unload_entry",
+            "parent": "",
+            "signature": "async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool"
+          }
+        ]
+      },
+      {
+        "path": "custom_components/personal_hydration_manager/blueprints_install.py",
+        "symbols": [
+          {
+            "kind": "function",
+            "name": "async_install_blueprints",
+            "parent": "",
+            "signature": "async_install_blueprints(hass: HomeAssistant) -> None"
+          }
+        ]
+      },
+      {
+        "path": "custom_components/personal_hydration_manager/config_flow.py",
+        "symbols": [
+          {
+            "kind": "const",
+            "name": "CONF_UNIT",
+            "parent": "",
+            "signature": "CONF_UNIT = \"unit\""
+          },
+          {
+            "kind": "class",
+            "name": "HydrationConfigFlow",
+            "parent": "",
+            "signature": "class HydrationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN)"
+          },
+          {
+            "kind": "class",
+            "name": "HydrationOptionsFlow",
+            "parent": "",
+            "signature": "class HydrationOptionsFlow(config_entries.OptionsFlow)"
+          }
+        ]
+      },
+      {
+        "path": "custom_components/personal_hydration_manager/const.py",
+        "symbols": [
+          {
+            "kind": "const",
+            "name": "DOMAIN",
+            "parent": "",
+            "signature": "DOMAIN = \"personal_hydration_manager\""
+          },
+          {
+            "kind": "const",
+            "name": "PLATFORMS",
+            "parent": "",
+            "signature": "PLATFORMS = [\"sensor\", \"number\"]"
+          },
+          {
+            "kind": "const",
+            "name": "ENTITY_ID_PREFIX",
+            "parent": "",
+            "signature": "ENTITY_ID_PREFIX = \"phm\""
+          },
+          {
+            "kind": "const",
+            "name": "CONF_NAME",
+            "parent": "",
+            "signature": "CONF_NAME = \"name\""
+          },
+          {
+            "kind": "const",
+            "name": "CONF_AGE",
+            "parent": "",
+            "signature": "CONF_AGE = \"age\""
+          },
+          {
+            "kind": "const",
+            "name": "CONF_GENDER",
+            "parent": "",
+            "signature": "CONF_GENDER = \"gender\""
+          },
+          {
+            "kind": "const",
+            "name": "CONF_PREGNANCY",
+            "parent": "",
+            "signature": "CONF_PREGNANCY = \"pregnancy\""
+          },
+          {
+            "kind": "const",
+            "name": "CONF_LACTATION",
+            "parent": "",
+            "signature": "CONF_LACTATION = \"lactation\""
+          },
+          {
+            "kind": "const",
+            "name": "CONF_DAY_START",
+            "parent": "",
+            "signature": "CONF_DAY_START = \"day_start\""
+          },
+          {
+            "kind": "const",
+            "name": "CONF_DAY_END",
+            "parent": "",
+            "signature": "CONF_DAY_END = \"day_end\""
+          },
+          {
+            "kind": "const",
+            "name": "CONF_SOURCE_SENSOR",
+            "parent": "",
+            "signature": "CONF_SOURCE_SENSOR = \"source_sensor\""
+          },
+          {
+            "kind": "const",
+            "name": "CONF_SOURCE_MODE",
+            "parent": "",
+            "signature": "CONF_SOURCE_MODE = \"source_mode\""
+          },
+          {
+            "kind": "const",
+            "name": "CONF_UNIT",
+            "parent": "",
+            "signature": "CONF_UNIT = \"unit\""
+          },
+          {
+            "kind": "const",
+            "name": "GENDER_MALE",
+            "parent": "",
+            "signature": "GENDER_MALE = \"male\""
+          },
+          {
+            "kind": "const",
+            "name": "GENDER_FEMALE",
+            "parent": "",
+            "signature": "GENDER_FEMALE = \"female\""
+          },
+          {
+            "kind": "const",
+            "name": "GENDERS",
+            "parent": "",
+            "signature": "GENDERS = [GENDER_MALE, GENDER_FEMALE]"
+          },
+          {
+            "kind": "const",
+            "name": "SOURCE_MODE_DELTA",
+            "parent": "",
+            "signature": "SOURCE_MODE_DELTA = \"delta\""
+          },
+          {
+            "kind": "const",
+            "name": "SOURCE_MODE_SUM",
+            "parent": "",
+            "signature": "SOURCE_MODE_SUM = \"sum\""
+          },
+          {
+            "kind": "const",
+            "name": "SOURCE_MODE_ABSOLUTE",
+            "parent": "",
+            "signature": "SOURCE_MODE_ABSOLUTE = \"absolute\""
+          },
+          {
+            "kind": "const",
+            "name": "SOURCE_MODES",
+            "parent": "",
+            "signature": "SOURCE_MODES = [SOURCE_MODE_ABSOLUTE, SOURCE_MODE_DELTA, SOURCE_MODE_SUM]"
+          },
+          {
+            "kind": "const",
+            "name": "DEFAULT_DAY_START",
+            "parent": "",
+            "signature": "DEFAULT_DAY_START = \"07:00:00\""
+          },
+          {
+            "kind": "const",
+            "name": "DEFAULT_DAY_END",
+            "parent": "",
+            "signature": "DEFAULT_DAY_END = \"22:00:00\""
+          },
+          {
+            "kind": "const",
+            "name": "EVENT_DRINK",
+            "parent": "",
+            "signature": "EVENT_DRINK = \"personal_hydration_manager_drink\""
+          },
+          {
+            "kind": "const",
+            "name": "SERVICE_LOG_DRINK",
+            "parent": "",
+            "signature": "SERVICE_LOG_DRINK = \"log_drink\""
+          },
+          {
+            "kind": "const",
+            "name": "SERVICE_RESET_TODAY",
+            "parent": "",
+            "signature": "SERVICE_RESET_TODAY = \"reset_today\""
+          },
+          {
+            "kind": "const",
+            "name": "SERVICE_SET_CONSUMED",
+            "parent": "",
+            "signature": "SERVICE_SET_CONSUMED = \"set_consumed\""
+          },
+          {
+            "kind": "const",
+            "name": "UNIT_ML",
+            "parent": "",
+            "signature": "UNIT_ML = \"mL\""
+          },
+          {
+            "kind": "const",
+            "name": "UNIT_L",
+            "parent": "",
+            "signature": "UNIT_L = \"L\""
+          },
+          {
+            "kind": "const",
+            "name": "UNIT_FL_OZ",
+            "parent": "",
+            "signature": "UNIT_FL_OZ = \"fl_oz\""
+          },
+          {
+            "kind": "const",
+            "name": "UNITS",
+            "parent": "",
+            "signature": "UNITS = [UNIT_ML, UNIT_L, UNIT_FL_OZ]"
+          },
+          {
+            "kind": "const",
+            "name": "ATTR_PROFILE",
+            "parent": "",
+            "signature": "ATTR_PROFILE = \"profile\""
+          },
+          {
+            "kind": "const",
+            "name": "ATTR_VOLUME",
+            "parent": "",
+            "signature": "ATTR_VOLUME = \"volume\""
+          },
+          {
+            "kind": "const",
+            "name": "ATTR_UNIT",
+            "parent": "",
+            "signature": "ATTR_UNIT = \"unit\""
+          },
+          {
+            "kind": "const",
+            "name": "STORAGE_VERSION",
+            "parent": "",
+            "signature": "STORAGE_VERSION = 1"
+          },
+          {
+            "kind": "const",
+            "name": "STORAGE_KEY_FMT",
+            "parent": "",
+            "signature": "STORAGE_KEY_FMT = \"personal_hydration_manager.{entry_id}\""
+          },
+          {
+            "kind": "const",
+            "name": "SIGNAL_UPDATE_FMT",
+            "parent": "",
+            "signature": "SIGNAL_UPDATE_FMT = \"personal_hydration_manager_update_{entry_id}\""
+          },
+          {
+            "kind": "const",
+            "name": "NASEM_TABLE",
+            "parent": "",
+            "signature": "NASEM_TABLE: list[tuple[int, int, str | None, int]] = ["
+          },
+          {
+            "kind": "const",
+            "name": "PREGNANCY_TARGET_ML",
+            "parent": "",
+            "signature": "PREGNANCY_TARGET_ML = 2400"
+          },
+          {
+            "kind": "const",
+            "name": "LACTATION_TARGET_ML",
+            "parent": "",
+            "signature": "LACTATION_TARGET_ML = 3000"
+          },
+          {
+            "kind": "const",
+            "name": "FALLBACK_TARGET_ML",
+            "parent": "",
+            "signature": "FALLBACK_TARGET_ML = 2200"
+          },
+          {
+            "kind": "function",
+            "name": "to_ml",
+            "parent": "",
+            "signature": "to_ml(volume: float, unit: str) -> float"
+          },
+          {
+            "kind": "function",
+            "name": "from_ml",
+            "parent": "",
+            "signature": "from_ml(volume_ml: float, unit: str) -> float"
+          },
+          {
+            "kind": "function",
+            "name": "unit_label",
+            "parent": "",
+            "signature": "unit_label(unit: str) -> str"
+          },
+          {
+            "kind": "function",
+            "name": "pace_unit_label",
+            "parent": "",
+            "signature": "pace_unit_label(unit: str) -> str"
+          }
+        ]
+      },
+      {
+        "path": "custom_components/personal_hydration_manager/coordinator.py",
+        "symbols": [
+          {
+            "kind": "const",
+            "name": "CONF_UNIT",
+            "parent": "",
+            "signature": "CONF_UNIT = \"unit\""
+          },
+          {
+            "kind": "class",
+            "name": "HydrationCoordinator",
+            "parent": "",
+            "signature": "class HydrationCoordinator"
+          },
+          {
+            "kind": "function",
+            "name": "signal",
+            "parent": "HydrationCoordinator",
+            "signature": "signal(self) -> str"
+          },
+          {
+            "kind": "function",
+            "name": "target_ml",
+            "parent": "HydrationCoordinator",
+            "signature": "target_ml(self) -> int"
+          },
+          {
+            "kind": "function",
+            "name": "remaining_ml",
+            "parent": "HydrationCoordinator",
+            "signature": "remaining_ml(self) -> float"
+          },
+          {
+            "kind": "function",
+            "name": "progress_percent",
+            "parent": "HydrationCoordinator",
+            "signature": "progress_percent(self) -> float"
+          },
+          {
+            "kind": "function",
+            "name": "hourly_pace_ml",
+            "parent": "HydrationCoordinator",
+            "signature": "hourly_pace_ml(self) -> float"
+          },
+          {
+            "kind": "function",
+            "name": "async_initialize",
+            "parent": "HydrationCoordinator",
+            "signature": "async_initialize(self) -> None"
+          },
+          {
+            "kind": "function",
+            "name": "async_shutdown",
+            "parent": "HydrationCoordinator",
+            "signature": "async_shutdown(self) -> None"
+          },
+          {
+            "kind": "function",
+            "name": "async_reset_today",
+            "parent": "HydrationCoordinator",
+            "signature": "async_reset_today(self) -> None"
+          },
+          {
+            "kind": "function",
+            "name": "async_add_drink",
+            "parent": "HydrationCoordinator",
+            "signature": "async_add_drink(self, volume: float, unit: str) -> None"
+          },
+          {
+            "kind": "function",
+            "name": "async_set_consumed",
+            "parent": "HydrationCoordinator",
+            "signature": "async_set_consumed(self, volume: float, unit: str) -> None"
+          },
+          {
+            "kind": "function",
+            "name": "async_set_target_override",
+            "parent": "HydrationCoordinator",
+            "signature": "async_set_target_override(self, volume_ml: float) -> None"
+          }
+        ]
+      },
+      {
+        "path": "custom_components/personal_hydration_manager/frontend.py",
+        "symbols": [
+          {
+            "kind": "const",
+            "name": "CARD_VERSION",
+            "parent": "",
+            "signature": "CARD_VERSION = \"0.4.1\""
+          },
+          {
+            "kind": "const",
+            "name": "STATIC_URL_BASE",
+            "parent": "",
+            "signature": "STATIC_URL_BASE = \"/personal_hydration_manager_static\""
+          },
+          {
+            "kind": "const",
+            "name": "CARD_FILE",
+            "parent": "",
+            "signature": "CARD_FILE = \"personal-hydration-card.js\""
+          },
+          {
+            "kind": "const",
+            "name": "CARD_URL",
+            "parent": "",
+            "signature": "CARD_URL = f\"{STATIC_URL_BASE}/{CARD_FILE}\""
+          },
+          {
+            "kind": "const",
+            "name": "CARD_URL_VERSIONED",
+            "parent": "",
+            "signature": "CARD_URL_VERSIONED = f\"{CARD_URL}?v={CARD_VERSION}\""
+          },
+          {
+            "kind": "function",
+            "name": "async_register_frontend",
+            "parent": "",
+            "signature": "async_register_frontend(hass: HomeAssistant) -> None"
+          }
+        ]
+      },
+      {
+        "path": "custom_components/personal_hydration_manager/number.py",
+        "symbols": [
+          {
+            "kind": "const",
+            "name": "ENTITY_ID_PREFIX",
+            "parent": "",
+            "signature": "ENTITY_ID_PREFIX = \"phm\""
+          },
+          {
+            "kind": "class",
+            "name": "TargetOverrideNumber",
+            "parent": "",
+            "signature": "class TargetOverrideNumber(NumberEntity)"
+          },
+          {
+            "kind": "function",
+            "name": "native_unit_of_measurement",
+            "parent": "TargetOverrideNumber",
+            "signature": "native_unit_of_measurement(self) -> str"
+          },
+          {
+            "kind": "function",
+            "name": "native_min_value",
+            "parent": "TargetOverrideNumber",
+            "signature": "native_min_value(self) -> float"
+          },
+          {
+            "kind": "function",
+            "name": "native_max_value",
+            "parent": "TargetOverrideNumber",
+            "signature": "native_max_value(self) -> float"
+          },
+          {
+            "kind": "function",
+            "name": "native_step",
+            "parent": "TargetOverrideNumber",
+            "signature": "native_step(self) -> float"
+          },
+          {
+            "kind": "function",
+            "name": "async_added_to_hass",
+            "parent": "TargetOverrideNumber",
+            "signature": "async_added_to_hass(self) -> None"
+          },
+          {
+            "kind": "function",
+            "name": "native_value",
+            "parent": "TargetOverrideNumber",
+            "signature": "native_value(self) -> float"
+          },
+          {
+            "kind": "function",
+            "name": "async_set_native_value",
+            "parent": "TargetOverrideNumber",
+            "signature": "async_set_native_value(self, value: float) -> None"
+          }
+        ]
+      },
+      {
+        "path": "custom_components/personal_hydration_manager/sensor.py",
+        "symbols": [
+          {
+            "kind": "const",
+            "name": "ENTITY_ID_PREFIX",
+            "parent": "",
+            "signature": "ENTITY_ID_PREFIX = \"phm\""
+          },
+          {
+            "kind": "function",
+            "name": "async_added_to_hass",
+            "parent": "_BaseHydrationSensor",
+            "signature": "async_added_to_hass(self) -> None"
+          },
+          {
+            "kind": "function",
+            "name": "native_unit_of_measurement",
+            "parent": "_VolumeSensor",
+            "signature": "native_unit_of_measurement(self) -> str"
+          },
+          {
+            "kind": "class",
+            "name": "DailyTargetSensor",
+            "parent": "",
+            "signature": "class DailyTargetSensor(_VolumeSensor)"
+          },
+          {
+            "kind": "function",
+            "name": "native_value",
+            "parent": "DailyTargetSensor",
+            "signature": "native_value(self) -> float"
+          },
+          {
+            "kind": "function",
+            "name": "extra_state_attributes",
+            "parent": "DailyTargetSensor",
+            "signature": "extra_state_attributes(self) -> dict"
+          },
+          {
+            "kind": "class",
+            "name": "ConsumedTodaySensor",
+            "parent": "",
+            "signature": "class ConsumedTodaySensor(_VolumeSensor)"
+          },
+          {
+            "kind": "class",
+            "name": "ManualConsumedSensor",
+            "parent": "",
+            "signature": "class ManualConsumedSensor(_VolumeSensor)"
+          },
+          {
+            "kind": "class",
+            "name": "RemainingSensor",
+            "parent": "",
+            "signature": "class RemainingSensor(_VolumeSensor)"
+          },
+          {
+            "kind": "class",
+            "name": "HourlyPaceSensor",
+            "parent": "",
+            "signature": "class HourlyPaceSensor(_BaseHydrationSensor)"
+          },
+          {
+            "kind": "class",
+            "name": "ProgressSensor",
+            "parent": "",
+            "signature": "class ProgressSensor(_BaseHydrationSensor)"
+          }
+        ]
+      },
+      {
+        "path": "custom_components/personal_hydration_manager/www/personal-hydration-card.js",
+        "symbols": [
+          {
+            "kind": "function",
+            "name": "mlToDisplay",
+            "parent": "",
+            "signature": "function mlToDisplay(ml, unit)"
+          },
+          {
+            "kind": "function",
+            "name": "unitLabel",
+            "parent": "",
+            "signature": "function unitLabel(unit, ml)"
+          },
+          {
+            "kind": "function",
+            "name": "paceLabel",
+            "parent": "",
+            "signature": "function paceLabel(ml, unit)"
+          },
+          {
+            "kind": "function",
+            "name": "fireEvent",
+            "parent": "",
+            "signature": "function fireEvent(node, type, detail)"
+          },
+          {
+            "kind": "class",
+            "name": "PersonalHydrationCard",
+            "parent": "",
+            "signature": "class PersonalHydrationCard extends HTMLElement"
+          },
+          {
+            "kind": "function",
+            "name": "normaliseQuickAdd",
+            "parent": "",
+            "signature": "function normaliseQuickAdd(values)"
+          },
+          {
+            "kind": "function",
+            "name": "editorSchema",
+            "parent": "",
+            "signature": "function editorSchema(candidates)"
+          },
+          {
+            "kind": "function",
+            "name": "loadHaComponents",
+            "parent": "",
+            "signature": "function loadHaComponents()"
+          },
+          {
+            "kind": "class",
+            "name": "PersonalHydrationCardEditor",
+            "parent": "",
+            "signature": "class PersonalHydrationCardEditor extends HTMLElement"
+          }
+        ]
+      },
+      {
+        "path": "scripts/mock-percent-in-cup.mjs",
+        "symbols": [
+          {
+            "kind": "const",
+            "name": "buildSheet",
+            "parent": "",
+            "signature": "const buildSheet = async (page,"
+          },
+          {
+            "kind": "const",
+            "name": "fakeHass",
+            "parent": "",
+            "signature": "const fakeHass = (pct) =>"
+          },
+          {
+            "kind": "const",
+            "name": "s",
+            "parent": "",
+            "signature": "const s = (state, friendly_name) => ("
+          },
+          {
+            "kind": "const",
+            "name": "makeCard",
+            "parent": "",
+            "signature": "const makeCard = (pct) =>"
+          },
+          {
+            "kind": "const",
+            "name": "section",
+            "parent": "",
+            "signature": "const section = (titleText, blurbText) =>"
+          },
+          {
+            "kind": "const",
+            "name": "addCell",
+            "parent": "",
+            "signature": "const addCell = (row, label, pct) =>"
+          }
+        ]
+      },
+      {
+        "path": "scripts/verify-card-editor.mjs",
+        "symbols": [
+          {
+            "kind": "const",
+            "name": "check",
+            "parent": "",
+            "signature": "const check = (name, pass, detail) =>"
+          },
+          {
+            "kind": "const",
+            "name": "BUILD",
+            "parent": "",
+            "signature": "const BUILD = async () =>"
+          },
+          {
+            "kind": "const",
+            "name": "sleep",
+            "parent": "",
+            "signature": "const sleep = (ms)"
+          },
+          {
+            "kind": "const",
+            "name": "waitFor",
+            "parent": "",
+            "signature": "const waitFor = async (tag, ms) =>"
+          },
+          {
+            "kind": "const",
+            "name": "bootstrap",
+            "parent": "",
+            "signature": "const bootstrap = async () =>"
+          },
+          {
+            "kind": "const",
+            "name": "resilient",
+            "parent": "",
+            "signature": "const resilient = async (fn) =>"
+          },
+          {
+            "kind": "const",
+            "name": "grab",
+            "parent": "",
+            "signature": "const grab = (e) =>"
+          },
+          {
+            "kind": "const",
+            "name": "fire",
+            "parent": "",
+            "signature": "const fire = (value)"
+          },
+          {
+            "kind": "const",
+            "name": "findDeep",
+            "parent": "",
+            "signature": "const findDeep = (root, tag) =>"
+          },
+          {
+            "kind": "const",
+            "name": "shoot",
+            "parent": "",
+            "signature": "const shoot = async (width, name) => resilient(async () =>"
+          }
+        ]
+      },
+      {
+        "path": "scripts/verify-custom-add.mjs",
+        "symbols": [
+          {
+            "kind": "const",
+            "name": "check",
+            "parent": "",
+            "signature": "const check = (name, pass, detail) =>"
+          },
+          {
+            "kind": "const",
+            "name": "BUILD",
+            "parent": "",
+            "signature": "const BUILD = async () =>"
+          },
+          {
+            "kind": "const",
+            "name": "sleep",
+            "parent": "",
+            "signature": "const sleep = (ms)"
+          },
+          {
+            "kind": "const",
+            "name": "bootstrap",
+            "parent": "",
+            "signature": "const bootstrap = async () =>"
+          },
+          {
+            "kind": "const",
+            "name": "resilient",
+            "parent": "",
+            "signature": "const resilient = async (fn) =>"
+          },
+          {
+            "kind": "const",
+            "name": "q",
+            "parent": "",
+            "signature": "const q = (sel)"
+          },
+          {
+            "kind": "const",
+            "name": "proxied",
+            "parent": "",
+            "signature": "const proxied = (h)"
+          },
+          {
+            "kind": "const",
+            "name": "shoot",
+            "parent": "",
+            "signature": "const shoot = async (width, name) => resilient(async () =>"
+          }
+        ]
+      },
+      {
+        "path": "scripts/verify-percent-in-cup.mjs",
+        "symbols": [
+          {
+            "kind": "const",
+            "name": "check",
+            "parent": "",
+            "signature": "const check = (name, pass, detail) =>"
+          },
+          {
+            "kind": "const",
+            "name": "BUILD",
+            "parent": "",
+            "signature": "const BUILD = async (profile) =>"
+          },
+          {
+            "kind": "const",
+            "name": "sleep",
+            "parent": "",
+            "signature": "const sleep = (ms)"
+          },
+          {
+            "kind": "const",
+            "name": "bootstrap",
+            "parent": "",
+            "signature": "const bootstrap = async () =>"
+          },
+          {
+            "kind": "const",
+            "name": "resilient",
+            "parent": "",
+            "signature": "const resilient = async (fn) =>"
+          },
+          {
+            "kind": "const",
+            "name": "injectHelpers",
+            "parent": "",
+            "signature": "const injectHelpers = () => page.evaluate(() =>"
+          },
+          {
+            "kind": "const",
+            "name": "st",
+            "parent": "",
+            "signature": "const st = (v) => ("
+          },
+          {
+            "kind": "const",
+            "name": "parse",
+            "parent": "",
+            "signature": "const parse = (c) =>"
+          },
+          {
+            "kind": "const",
+            "name": "over",
+            "parent": "",
+            "signature": "const over = (fg, bg) => ("
+          },
+          {
+            "kind": "const",
+            "name": "lum",
+            "parent": "",
+            "signature": "const lum = (c) =>"
+          },
+          {
+            "kind": "const",
+            "name": "f",
+            "parent": "",
+            "signature": "const f = (v) =>"
+          },
+          {
+            "kind": "const",
+            "name": "interior",
+            "parent": "",
+            "signature": "const interior = (200 - 2 * left) - 3; // minus the 3-unit stroke"
+          },
+          {
+            "kind": "const",
+            "name": "read",
+            "parent": "",
+            "signature": "const read = () =>"
+          },
+          {
+            "kind": "const",
+            "name": "measure",
+            "parent": "",
+            "signature": "const measure = () =>"
+          },
+          {
+            "kind": "const",
+            "name": "shoot",
+            "parent": "",
+            "signature": "const shoot = async (name, width, pct) =>"
+          }
+        ]
+      }
+    ]
+  },
+  "tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_coordinator_pace.py",
+    "tests/test_coordinator_reset.py",
+    "tests/test_coordinator_sum_mode.py",
+    "tests/test_frontend.py",
+    "tests/test_packaging.py"
+  ],
+  "operations": [
+    ".github/workflows/release.yaml",
+    ".github/workflows/validate.yaml"
+  ],
+  "limitations": {
+    "unparsed_languages": [],
+    "excluded_dirs": [],
+    "code_map_truncated": false,
+    "code_map_symbols_capped": true,
+    "tracked_files_only": true
+  },
+  "generated": {
+    "source_commit": "74294f087c7ed09e4e9f52712aa3e23f1c42c853",
+    "content_hash": "1f1896a93951c48a",
+    "generator": "navgen"
+  }
+}
